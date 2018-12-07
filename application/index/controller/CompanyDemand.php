@@ -391,21 +391,6 @@ class CompanyDemand extends Common
 
     }
 
-    public function  getMatches(){
-        $request = Request::instance();
-        $user_id = $request->param('demand_id','','trim');
-        $page = $request->param('page',1,'intval');
-        $rows = $request->param('rows',10,'intval');
-        $begin_item = ($page-1)*$rows;
-
-        $users = $this->getLowerLevelUsers($user_id);
-        $users = json_decode($users,true);
-
-        $matches_result = Db::view('match','*')
-                        ->view('')
-            ->where()->select();
-
-    }
 
     public function demandMatchList(){
 
@@ -523,6 +508,15 @@ class CompanyDemand extends Common
         }else{
             return $this->error_msg(1);
         }
+
+    }
+
+
+    public function changeStatu(){
+        $request = Request::instance();
+
+
+
 
     }
 

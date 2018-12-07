@@ -9,6 +9,7 @@
 namespace app\index\controller;
 
 
+use think\Db;
 use think\Loader;
 use think\Request;
 
@@ -80,6 +81,8 @@ class Logistics extends Common
         $cost = $request->param('cost','','trim');
         $approve_remark = $request->param('approve_remark','','trim');
         $status =  $request->param('status','','trim');
+        $express_company =  $request->param('express_company','','trim');
+        $express_number =  $request->param('express_number','','trim');
 
         if(!$logistics_id){
             return $this->error_msg('参数错误');
@@ -90,7 +93,9 @@ class Logistics extends Common
             'cost'      =>  $cost,
             'approve_remark'=> $approve_remark,
             'status'    =>  $status,
-            'approve_time'=>date('%Y-%m-%d %H:%i:%s',time())
+            'express_company'    =>  $express_company,
+            'express_number'    =>  $express_number,
+            'approve_time'=>date('Y-m-d H:i:s',time())
         ];
 
         $model = Loader::model('logistics');
@@ -101,9 +106,6 @@ class Logistics extends Common
         }else{
             return $this->error_msg(2);
         }
-
-
-
 
     }
 
@@ -146,13 +148,14 @@ class Logistics extends Common
             $where['created'] = ['lt',$maxTime];
         }
 
-        $result  = Db('logistics')
+        $result = Db::view('logistics',"*")
+            ->view('user','user_name as approver','logistics.approver = user.user_id','left')
             ->where($where)->limit($begin_item,$rows)->select();
         $count = Db('logistics')->where($where)->count();
         if($result){
             return $this->success_msg($result,$count);
         }else{
-            return $this->error_msg(1);
+            return $this->success_msg(3);
         }
     }
 
