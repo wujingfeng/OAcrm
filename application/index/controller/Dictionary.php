@@ -10,6 +10,7 @@ namespace app\index\controller;
 
 
 use app\index\model\AreaMap;
+use think\Config;
 use think\Db;
 use think\Loader;
 use think\Request;
@@ -104,6 +105,41 @@ class Dictionary extends Common
         if($areamapResult){
             $areamapTree = $this->generate_tree($areamapResult,'area_id','parent_id');
             return $this->success_msg($areamapTree);
+        }else{
+            return $this->error_msg(2);
+        }
+
+    }
+
+
+    /**
+     * 删除字典
+     * @return \think\response\Json
+     */
+    public function delDictionary(){
+        $dictionary_id = Request::instance()->param('dictionary_id','','trim');
+        $user_id = Request::instance()->param('user_id','','trim');
+        $dictionarys = Config::get('parameter.can_not_del_dict');
+
+        if(!$dictionary_id){
+            return $this->error_msg('参数异常');
+        }
+        $top_dict_result = Db('dictionary')->field('dictionary_id')->where(['parent_id'=>0])->select();
+        $dictionarys = array_merge(array_column($top_dict_result,'dictionary_id'),$dictionarys);
+
+        if(in_array($dictionary_id,$dictionarys)){
+            return $this->error_msg('此字典和顶级字典不能被删除'); # 指定字典值也不能被删除
+        }
+        $where = [
+            'parent_id' => ['neq',0], # 顶级字典不能删除
+            'dictionary_id'=>$dictionary_id
+        ];
+
+
+        $result = Db('dictionary')->where($where)->delete();
+//        dump($result);
+        if($result){
+            return $this->success_msg(1);
         }else{
             return $this->error_msg(2);
         }

@@ -22,12 +22,12 @@ class Role extends Common
      */
     public function saveRole(){
         $request            = Request::instance();
-        $user_id            = $request->param('user_id','6dc0d3c943c75a6de0ca7b90d97cd602','trim');#当前用户id
+        $user_id            = $request->param('user_id','','trim');#当前用户id
         $role_id            = $request->param('role_id','','trim');#角色id
-        $organization_id    = $request->param('organization_id','b6d767d2f8ed5d21a44b0e5886680cb9','trim');#所属组织id
+        $organization_id    = $request->param('organization_id','','trim');#所属组织id
         $role_permission    = $request->param('role_permission','','trim');#所属拥有的权限(逗号拼接)
-        $role_name          = $request->param('role_name','业务员2','trim');#角色名称
-        $role_description   = $request->param('description','不想当将军的厨子不是好司机','trim');#角色描述
+        $role_name          = $request->param('role_name','','trim');#角色名称
+        $role_description   = $request->param('description','','trim');#角色描述
 
         $data = [
             'organization_id'   =>  $organization_id,

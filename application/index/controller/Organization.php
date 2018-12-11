@@ -19,7 +19,7 @@ class Organization extends Common
     public function  saveOrganization(){
         $request        = Request::instance();
         $organization_id= $request->param('organization_id','','trim');#组织id
-        $parent_id      = $request->param('parent_id','cfcd208495d565ef66e7dff9f98764da','trim');#上级组织id
+        $parent_id      = $request->param('parent_id','','trim');#上级组织id
         $name           = $request->param('name','业务部2','trim');#组织名称
         $description    = $request->param('description',"",'trim');#组织描述/备注
 

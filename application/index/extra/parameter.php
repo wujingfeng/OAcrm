@@ -47,8 +47,13 @@ return [
         'three_category'    =>  'bad32008095ec426c825c5da333f0af2', # 三类人员
         'social_security'   =>  'e476f42feea7331bf175e3d203dfa627', # 社保
         'education'         =>  'ebbc6da5d7ca624592904d9a41786cbb' # 学历
-    ]
+    ],
 
+    # 指定不能被删除的字典值
+    'can_not_del_dict'  =>[
+        'f95c1a880f5ad672ccf76516a620e811', # 潜在客户
+        '5ebf1d7b31ded660cc201b500db053c9', # 签约客户
+    ]
 
 
 

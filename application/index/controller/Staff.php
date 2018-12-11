@@ -23,6 +23,7 @@ class Staff extends Common
     public function saveStaff(){
         $request = Request::instance();
 
+        $id   =       $request->param('id','','trim'); #人员id
         $staff_id   =       $request->param('staff_id','','trim'); #人员id
         $user_id    =       $request->param('user_id','','trim'); #录入人id
         $name       =       $request->param('name','','trim');  # 人员姓名
@@ -91,7 +92,7 @@ class Staff extends Common
         $staffCard = Loader::model('staff_card');
 
         $card_data = [];
-        if(!$staff_id){
+        if(!$id){
 
             #插入
 
@@ -113,11 +114,11 @@ class Staff extends Common
             #更新
             $result = $staff->save($data,['staff_id'=>$staff_id]);
 
-            # 更新证书(直接删除更新更快)
-            $where = [
-                'staff_id'  =>  $staff_id
-            ];
-            $staffCard->where($where)->delete();
+//            # 更新证书(直接删除更新更快)
+//            $where = [
+//                'staff_id'  =>  $staff_id
+//            ];
+//            $staffCard->where($where)->delete();
 
         }
 
@@ -155,8 +156,15 @@ class Staff extends Common
         }
 
         if($card_data){
-            $card_result = $staffCard->saveAll($card_data);
+            if(!$id){
+                # 证件没有则添加
+                $card_result = $staffCard->saveAll($card_data);
+            }else{
+                # 有则更新
+                $card_result = $staffCard->save($card_data[0],['id'=>$id]);
+            }
         }
+
 
         if($result or $card_result){
             return $this->success_msg(1);
@@ -214,14 +222,19 @@ class Staff extends Common
 //            'staff_cards.status'=>1
         ];
 
-            # 如果是在匹配中获取人员列表，则应该排除已匹配的证件
+            # 如果用于匹配的人员列表  则应该只是签约客户5ebf1d7b31ded660cc201b500db053c9
+            # 并且应该排除已匹配人员
         if($type == 'match'){
+            $customer_type = '5ebf1d7b31ded660cc201b500db053c9';
+//            # 是在匹配中获取人员列表，则应该排除已匹配的证件
             $matchRes = Db('match')->field('staff_card_id')->select();
             if($matchRes){
                 $matched_staff_id = array_column($matchRes,'staff_card_id');
 
                 $where['staff_cards.id'] = ['not in',$matched_staff_id];
             }
+
+
 
         }
 
@@ -238,7 +251,7 @@ class Staff extends Common
             $where['staff.bid_type'] = $bid_type;
         }
         if($customer_type){
-            $where['staff.customer_type'] = $customer_type;
+            $where['staff_cards.status'] = $customer_type;
         }
         if($duty){
             $where['staff.duty'] = $duty;
@@ -261,6 +274,7 @@ class Staff extends Common
             ->view('staff_cards','*','staff.staff_id = staff_cards.staff_id','left')
             ->view('user','user_name','user.user_id = staff.user_id','left')
             ->where($where)
+            ->order('staff_cards.modified desc')
             ->limit($begin_item,$rows)
             ->select();
         $staff_count = Db::view('staff','staff_id')

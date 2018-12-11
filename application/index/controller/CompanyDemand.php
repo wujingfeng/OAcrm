@@ -35,6 +35,7 @@ class CompanyDemand extends Common
         $company_type  =   $request->param('company_type','','trim'); # 企业类型
         $return_visit   =   $request->param('return_visit','','trim');  #是否回访
         $time_visit     =   $request->param('time_visit','','trim');    # 回访时间(如需回访,则时间必填)
+        $due_time     =   $request->param('duetime','','trim');    # 合同到期时间
         $other_card     =   $request->param('other_card/a',[]); # 其他证件(数组)
         $taxes         =   $request->param('taxes','0','trim');   # 税金
         $referee=  $request->param('referee','','trim'); # 推荐人
@@ -87,6 +88,7 @@ class CompanyDemand extends Common
         $data['taxes'] =  $taxes;
         $data['referee'] =  $referee;
         $data['remark'] =  $remark;
+        $data['due_time'] =  $due_time;
 
         $demand = Loader::model('CompanyDemand');
         $demandCard = Loader::model('demand_card');
@@ -229,6 +231,7 @@ class CompanyDemand extends Common
             ->view('demand_cards','*','company_demand.demand_id = demand_cards.demand_id','left')
             ->view('user','user_name','user.user_id = company_demand.user_id','left')
             ->where($where)
+            ->order('company_demand.modified desc')
             ->limit($begin_item,$rows)
             ->select();
         $demand_count = Db::view('company_demand','demand_id')
@@ -327,8 +330,8 @@ class CompanyDemand extends Common
      */
     public function saveMatches(){
         $request = Request::instance();
-        $demand_id        = $request->param('demand_id','57835e8a04da8fe8b4e027fa17695608','trim'); # 需求id
-        $user_id        = $request->param('user_id','a6dcaca1f6cb19f3450996c0057ea4e1','trim'); # 录入人id
+        $demand_id        = $request->param('demand_id','','trim'); # 需求id
+        $user_id        = $request->param('user_id','','trim'); # 录入人id
         $params         = $request->param('argvs/a',[]);
 //        dump($params);
 //        exit();
@@ -351,11 +354,12 @@ class CompanyDemand extends Common
                 'staff_id'     =>  $param['staff_id'],
                 'staff_card_id'     =>  $param['staff_card_id'],
                 'demand_card_id'     =>  $param['demand_card_id'],
-                'status'     =>  '',
+//                'status'     =>  '',
                 'match_id'  => $match_id
             ];
             $result = Db('match')->insert($data,true); # 更新插入
         }
+
 
 
         if($result){
@@ -363,6 +367,36 @@ class CompanyDemand extends Common
         }else{
             return $this->error_msg(2);
         }
+
+    }
+
+    private function checkMatchFinish($demand_id=''){
+        if(!$demand_id){
+            return $this->error_msg('参数错误');
+        }
+
+        # 获取需要的人才总数
+        $needed_result = Db('demand_cards')
+            ->field('sum(needed_number) as need')
+            ->where(['demand_id'=>$demand_id])
+            ->group('demand_id')
+            ->select();
+        if($needed_result){
+            $needed_number = $needed_result['need'];
+        }else{
+            $needed_number = 0;
+        }
+
+        # 获取已配对总数
+        $matched_number = Db('match')
+            ->where(['demand_id'=>$demand_id])
+            ->count();
+        if($matched_number>=$needed_number){
+            $info = '配对完成';
+        }else{
+            $info = '配对中';
+        }
+
 
     }
 
@@ -419,9 +453,9 @@ class CompanyDemand extends Common
 
         #====== 编辑where条件 end
         #=====开始查询需求信息
-        $demand_result = Db::view('match','match_id,demand_id,staff_id,paid,unpaid,staff_id')
+        $demand_result = Db::view('match','match_id,demand_id,staff_id,staff_card_id,paid,unpaid,staff_id')
             ->view('demand_cards','number_needed,company_price','match.demand_card_id = demand_cards.id','left')
-            ->view('company_demand','company_name,company_place,user_id,demand_status,created','company_demand.demand_id = demand_cards.demand_id','left')
+            ->view('company_demand','company_name,company_place,user_id,demand_status,created,due_time','company_demand.demand_id = demand_cards.demand_id','left')
             ->view('staff','name as staff_name','staff.staff_id = match.staff_id','left')
             ->view('user','user_name','user.user_id = company_demand.user_id','left')
             ->where($where)
@@ -445,19 +479,38 @@ class CompanyDemand extends Common
             $count = count(array_unique($count_Arr));
 
             #===统计总条数
+            #======统计需求总数/价格 start
+            $demand_list_page = [];
+//            $staff_card_list_page = [];
+            foreach($demand_result as $d){
+                $demand_list_page[] = $d['demand_id'];
+//                $staff_card_list_page[] = $d['staff_card_id'];
+            }
+            $res = Db('demand_cards')
+                ->field('demand_id,SUM(number_needed) as number_needed,SUM(company_price) as company_price')
+                ->where(['demand_id'=>['in',$demand_list_page]])
+                ->group('demand_id')
+                ->select();
+            $demand_count_map = [];
+            if($res){
+                foreach($res as $re){
+                    $demand_count_map[$re['demand_id']]['number_needed'] = $re['number_needed'];
+                    $demand_count_map[$re['demand_id']]['company_price'] = $re['company_price'];
+                }
+            }
 
+            #======统计需求总数/价格 end
 
 
             foreach($demand_result as $d){
+
                 if(in_array($d['demand_id'],array_keys($final_result))){
-                    $final_result[$d['demand_id']]['number_needed'] += $d['number_needed'] ;
-                    $final_result[$d['demand_id']]['company_price'] += $d['company_price'] ;
+//                    $final_result[$d['demand_id']]['number_needed'] += $d['number_needed'] ;
+//                    $final_result[$d['demand_id']]['company_price'] += $d['company_price'] ;
                     $final_result[$d['demand_id']]['paid'] += $d['paid'] ;
                     $final_result[$d['demand_id']]['unpaid'] += $d['unpaid'] ;
                     $final_result[$d['demand_id']]['staff_name'] .= ','.$d['staff_name'] ;
                 }else{
-//                    $d['total_contract'] =
-//                    $d['staffs'][] = $d['staff_id'] ;
                     if($d['company_place']){
 
                         $places = explode(',',$d['company_place']);
@@ -470,6 +523,15 @@ class CompanyDemand extends Common
                         $d['company_place'] = $arr;
                     }
                     $final_result[$d['demand_id']] = $d;
+
+                    #=====修改统计需求总数/价格
+                    if(in_array($d['demand_id'],array_keys($demand_count_map))){
+                        $final_result[$d['demand_id']]['number_needed'] = $demand_count_map[$d['demand_id']]['number_needed'];
+                        $final_result[$d['demand_id']]['company_price'] = $demand_count_map[$d['demand_id']]['company_price'];
+                    }else{
+                        $final_result[$d['demand_id']]['number_needed'] = 0;
+                        $final_result[$d['demand_id']]['company_price'] = 0;
+                    }
                 }
 
             }
@@ -494,7 +556,7 @@ class CompanyDemand extends Common
         $where = [
             'match.demand_id'=>$demand_id
         ];
-        $result = Db::view('match','match_id,status')
+        $result = Db::view('match','match_id,status,paid,unpaid')
             ->view('demand_cards','company_price','match.demand_card_id = demand_cards.id','left')
             ->view('company_demand','company_name','company_demand.demand_id = demand_cards.demand_id','left')
             ->view('staff_cards','level,profession,register,other_card,talent_price,year','match.staff_card_id = staff_cards.id','left')
@@ -504,6 +566,10 @@ class CompanyDemand extends Common
             ->select();
 
         if($result){
+//            foreach ($result as &$re){
+//                $re['unpaid'] = $re['company_price']-$re['paid'];
+//                unset($re);
+//            }
             return $this->success_msg($result);
         }else{
             return $this->error_msg(1);
@@ -512,9 +578,57 @@ class CompanyDemand extends Common
     }
 
 
-    public function changeStatu(){
+    /**
+     * 修改配对详情状态信息
+     * @return \think\response\Json
+     */
+    public function changeStatus(){
         $request = Request::instance();
 
+        $id = $request->param('id','','intval');
+        $match_id = $request->param('match_id','','trim');
+        $status = $request->param('status','','trim');
+
+        $has_detail =  $request->param('has_detail','','trim'); # 是否有详情 没有就不传或传空
+        $this_paid = $request->param('paid','','trim'); # 本次支付金额
+        $transfer_way = $request->param('payway','','trim'); # 支付方式
+        $company_account = $request->param('account','','trim'); # 公司账号
+        $staff_notice_time = $request->param('notice_time','','trim'); # 人才公告时间
+        $demand_over_time = $request->param('over_time','','trim'); # 合同到期时间
+        $received_time = $request->param('receive_time','','trim'); # 到账时间
+
+        if(!$match_id){
+            return $this->error_msg('参数异常');
+        }
+
+        # 更新配对表中的状态
+        $matchModel = Loader::model('match');
+        $result = $matchModel->save(['status'=>$status],['match_id'=>$match_id]);
+
+        if($has_detail){
+            $data = [
+                'match_id'  =>  $match_id,
+                'this_paid'  =>  $this_paid,
+                'transfer_way'  =>  $transfer_way,
+                'company_account'  =>  $company_account,
+                'staff_notice_time'  =>  $staff_notice_time,
+                'demand_over_time'  =>  $demand_over_time,
+                'received_time'  =>  $received_time,
+            ];
+
+            $detailModel = Loader::model('match_detail');
+            if(!$id){
+                $result = $detailModel->save($data);
+            }else{
+                $result = $detailModel->save($data,['id'=>$id]);
+            }
+        }
+
+        if($result){
+            return $this->success_msg(1);
+        }else{
+            return $this->error_msg(2);
+        }
 
 
 

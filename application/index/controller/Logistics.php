@@ -118,6 +118,7 @@ class Logistics extends Common
         $request = Request::instance();
 
 //        $logistics_id = $request->param('logistics_id','','trim');
+        $user_id = $request->param('user_id',   '','trim');
         $status = $request->param('status','','trim');
         $logistics_type = $request->param('logistics_type','','trim');
         $customer_type = $request->param('customer_type','','trim');
@@ -128,7 +129,7 @@ class Logistics extends Common
         $rows = $request->param('rows',10,'intval');
         $begin_item = ($page-1)*$rows;
 
-        $where = false;
+        $where['user_id'] = $user_id;
         if($status){
             $where['status'] = $status;
         }

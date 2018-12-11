@@ -114,15 +114,18 @@ class General extends Common
         $type_map = [
             'staff' =>  [
                 'staff_card', # 模型名
-                'id'    # 查询的字段
+                'id',    # 查询的字段
+                'status' # 修改的字段
             ],
             'demand'=>  [
-                'demand_card',
-                'id'
+                'company_demand',
+                'demand_id',
+                'customer_type'
             ],
             'match' =>  [
                 'match',
-                'match_id'
+                'match_id',
+                'status'
             ]
         ];
 
@@ -131,6 +134,7 @@ class General extends Common
         }
         $model = $type_map[$type][0];
         $pk = $type_map[$type][1];
+        $status_type = $type_map[$type][2];
 //        $type = $type =='staff'?'staff_card':'demand_card';
 
 
@@ -140,7 +144,7 @@ class General extends Common
         }
         $model = Loader::model($model);
 
-        $result = $model->save(['status'=>$status],[$pk=>['IN',$id]]);
+        $result = $model->save([$status_type=>$status],[$pk=>['IN',$id]]);
 
         if($result){
             return $this->success_msg(1);
