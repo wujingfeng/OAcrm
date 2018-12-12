@@ -189,6 +189,7 @@ class Staff extends Common
 
         $staff_name = $request->param('staff_name','','trim');
         $card_place = $request->param('card_place','','trim');
+        $card_status = $request->param('card_status','','trim');
         $three_category = $request->param('three_category','','trim');
         $bid_type = $request->param('bid_type','','trim');
         $customer_type = $request->param('customer_type','','trim');
@@ -243,6 +244,9 @@ class Staff extends Common
         }
         if($card_place){
             $where['staff.card_place'] = $card_place;
+        }
+        if($card_status!=''){
+            $where['staff.card_status'] = $card_status;
         }
         if($three_category){
             $where['staff.three_category'] = $three_category;

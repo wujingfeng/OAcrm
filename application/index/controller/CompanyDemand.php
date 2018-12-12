@@ -508,7 +508,7 @@ class CompanyDemand extends Common
 //                    $final_result[$d['demand_id']]['number_needed'] += $d['number_needed'] ;
 //                    $final_result[$d['demand_id']]['company_price'] += $d['company_price'] ;
                     $final_result[$d['demand_id']]['paid'] += $d['paid'] ;
-                    $final_result[$d['demand_id']]['unpaid'] += $d['unpaid'] ;
+                    $final_result[$d['demand_id']]['unpaid'] -= $d['paid'] ;
                     $final_result[$d['demand_id']]['staff_name'] .= ','.$d['staff_name'] ;
                 }else{
                     if($d['company_place']){
@@ -532,6 +532,11 @@ class CompanyDemand extends Common
                         $final_result[$d['demand_id']]['number_needed'] = 0;
                         $final_result[$d['demand_id']]['company_price'] = 0;
                     }
+
+                    # 计算未转入金额
+                    $final_result[$d['demand_id']]['unpaid'] = $final_result[$d['demand_id']]['company_price']-$final_result[$d['demand_id']]['paid'];
+
+
                 }
 
             }
