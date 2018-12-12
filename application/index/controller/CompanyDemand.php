@@ -558,7 +558,7 @@ class CompanyDemand extends Common
         ];
         $result = Db::view('match','match_id,status,paid,unpaid')
             ->view('demand_cards','company_price','match.demand_card_id = demand_cards.id','left')
-            ->view('company_demand','company_name','company_demand.demand_id = demand_cards.demand_id','left')
+            ->view('company_demand','company_name,due_time','company_demand.demand_id = demand_cards.demand_id','left')
             ->view('staff_cards','level,profession,register,other_card,talent_price,year','match.staff_card_id = staff_cards.id','left')
             ->view('staff','name,three_category','staff.staff_id = staff_cards.staff_id','left')
             ->view('user','user_name','staff.user_id = user.user_id','left')
@@ -592,6 +592,7 @@ class CompanyDemand extends Common
         $has_detail =  $request->param('has_detail','','trim'); # 是否有详情 没有就不传或传空
         $this_paid = $request->param('paid','','trim'); # 本次支付金额
         $transfer_way = $request->param('payway','','trim'); # 支付方式
+        $transfer_message = $request->param('transfer_message','','trim'); # 转账方信息
         $company_account = $request->param('account','','trim'); # 公司账号
         $staff_notice_time = $request->param('notice_time','','trim'); # 人才公告时间
         $demand_over_time = $request->param('over_time','','trim'); # 合同到期时间
@@ -610,6 +611,7 @@ class CompanyDemand extends Common
                 'match_id'  =>  $match_id,
                 'this_paid'  =>  $this_paid,
                 'transfer_way'  =>  $transfer_way,
+                'transfer_message'  =>  $transfer_message,
                 'company_account'  =>  $company_account,
                 'staff_notice_time'  =>  $staff_notice_time,
                 'demand_over_time'  =>  $demand_over_time,
