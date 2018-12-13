@@ -129,24 +129,25 @@ class Logistics extends Common
         $rows = $request->param('rows',10,'intval');
         $begin_item = ($page-1)*$rows;
 
-        $where['user_id'] = $user_id;
+        $users = $this->getLowerLevelUsers($user_id);
+        $where['logistics.user_id'] = ['in',$users];
         if($status){
-            $where['status'] = $status;
+            $where['logistics.status'] = $status;
         }
         if($logistics_type){
             $where['logistics_type'] = $logistics_type;
         }
         if($customer_name){
-            $where['customer_name'] = $customer_name;
+            $where['logistics.customer_name'] = $customer_name;
         }
         if($customer_type){
-            $where['customer_type'] = $customer_type;
+            $where['logistics.customer_type'] = $customer_type;
         }
         if($minTime){
-            $where['created'] = ['gt',$minTime];
+            $where['logistics.created'] = ['gt',$minTime];
         }
         if($maxTime){
-            $where['created'] = ['lt',$maxTime];
+            $where['logistics.created'] = ['lt',$maxTime];
         }
 
         $result = Db::view('logistics',"*")

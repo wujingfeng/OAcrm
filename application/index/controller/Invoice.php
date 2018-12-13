@@ -102,8 +102,9 @@ class Invoice extends Common
         $rows = $request->param('rows',10,'trim'); #
         $begin_item = ($page-1)*$rows;
 
+        $users = $this->getLowerLevelUsers($user_id);
         $where = [
-            'invoice.user_id'   => $user_id
+            'invoice.user_id'   => ['in',$users]
         ];
 
         if($apply_company){

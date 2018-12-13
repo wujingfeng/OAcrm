@@ -96,4 +96,49 @@ class Organization extends Common
         }
     }
 
+
+    /**
+     * 删除组织机构
+     * @return \think\response\Json
+     */
+    public function delOrganization(){
+        $organization_id = Request::instance()->param('organization_id','','trim');
+        if(!$organization_id ){
+            return $this->error_msg('参数错误');
+        }
+        if($organization_id == 'd41d8cd98f00b204e9800998ecf8427e'){
+            return $this->error_msg('顶级组织不能删除');
+        }
+
+        $where = [
+            'organization_id '  =>  $organization_id
+        ];
+
+        #用户表,角色表,组织机构表都需要判断
+        $userExists = Db('user')->where($where)->find();
+        if($userExists){
+            return $this->error_msg('请先删除子节点');
+        }else{
+            $roleExists = Db('role')->where($where)->find();
+            if($roleExists){
+                return $this->error_msg('请先删除子节点');
+            }else{
+                $organizaExists = Db('organization')->where(['parent_id'=>$organization_id])->find();
+                if($organizaExists){
+                    return $this->error_msg('请先删除子节点');
+                }
+            }
+        }
+
+        # 不能删除顶级机构 即d41d8cd98f00b204e9800998ecf8427e
+        $where['parent_id'] = ['neq',0];
+        $result = Db('organization')->where($where)->delete();
+        if($result){
+            return $this->success_msg(1);
+        }else{
+            return $this->error_msg(2);
+        }
+
+    }
+
 }

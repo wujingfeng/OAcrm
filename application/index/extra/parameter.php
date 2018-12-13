@@ -53,6 +53,7 @@ return [
     'can_not_del_dict'  =>[
         'f95c1a880f5ad672ccf76516a620e811', # 潜在客户
         '5ebf1d7b31ded660cc201b500db053c9', # 签约客户
+        'd41d8cd98f00b204e9800998ecf8427e', # 最高机构(总公司)
     ]
 
 

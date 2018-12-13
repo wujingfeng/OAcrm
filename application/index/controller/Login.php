@@ -69,7 +69,7 @@ class Login extends  Common
      * 获取用户菜单权限(列表)
      * @return \think\response\Json
      */
-    public function getMenu(){
+    public function getMenu1(){
         $user_id = Request::instance()->param('user_id','','trim');
 
         $where = [
@@ -99,6 +99,7 @@ class Login extends  Common
         }
 
     }
+
 
 
 

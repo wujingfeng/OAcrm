@@ -24,6 +24,7 @@ class User extends  Common
         $organization_id = $request->param('dept_id','','trim');
         $mobile = $request->param('mobile','');
         $email  = $request->param('email','','trim');
+        $qq  = $request->param('qq','','trim');
 
         $data = [
             'user_name'     =>  $user_name,
@@ -34,6 +35,13 @@ class User extends  Common
             'email'         =>  $email,
         ];
 
+        #验证规则
+        $result = $this->validate($data,'Login.createUser');
+        if(true !== $result){
+            return $this->error_msg($result);
+        }
+
+        # 判断手机号是否已经存在
         if($user_id){
             # 更新时 不修改密码
             unset($data['password']);
@@ -42,19 +50,25 @@ class User extends  Common
                 'user_id'=>['<>',$user_id]
             ];
         }else{
+            # 如果是创建新用户,则不允许创建超级管理员的用户
+            if($organization_id == 'd41d8cd98f00b204e9800998ecf8427e'){
+                $isexist = Db('user')->where(['organization_id'=>$organization_id])->find();
+                if($isexist){
+                    return $this->error_msg('操作失败,已存在超级管理员');
+                }
+            }
+
+
             $mobileWhere = [
                 'mobile'=>$mobile,
             ];
         }
 
-        #验证规则
-        $result = $this->validate($data,'Login.createUser');
-        if(true !== $result){
-            $this->error($result);
-        }
+
 
         $data['password'] = md5($password);
         $data['role_id'] = $role_id;
+        $data['qq'] = $qq;
 
 
         $model = Loader::model('User');
@@ -92,12 +106,30 @@ class User extends  Common
             'role_id'   =>  $role_id
         ];
 
-        $role_result = Db('user')->field('user_id,user_name,mobile,email')->where($where)->select();
+        $role_result = Db('user')->field('user_id,user_name,mobile,email,qq')->where($where)->select();
 
         if($role_result){
             return $this->success_msg($role_result,count($role_result));
         }else{
             return $this->success_msg(3);
+        }
+
+    }
+
+    /**
+     * 删除用户
+     * @return \think\response\Json
+     */
+    public function delUser(){
+        $user_id = Request::instance()->param('user_id','','trim');
+        if(!$user_id){
+            return $this->error_msg('参数错误');
+        }
+        $result = Db('user')->where(['user_id'=>$user_id])->delete();
+        if($result){
+            return $this->success_msg(1);
+        }else{
+            return $this->error_msg(2);
         }
 
     }
