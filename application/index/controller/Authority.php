@@ -9,6 +9,7 @@
 namespace app\index\controller;
 
 
+use think\Db;
 use think\Loader;
 use think\Request;
 
@@ -23,7 +24,7 @@ class Authority extends  Common
         $remark = $request->param('remark','','trim');
         $order_num = $request->param('order_num',9999,'intval');
         $can_delete = $request->param('can_delete',0,'intval');
-        $type = $request->param('type','script','trim'); # 控制类型(script/interface) 脚本/接口
+        $script_name = $request->param('script_name','','trim'); # 脚本名字
         $valid = $request->param('valid',1,'intval');
         $can_change = $request->param('change',1,'intval');  #是否有编辑权限(1有 0没有)
         $menu_id = $request->param('menu_id','','trim');
@@ -31,14 +32,13 @@ class Authority extends  Common
         if(!$name){
             return $this->error_msg('参数错误');
         }
-        if($type == 'interface'){
-            $control = array_slice(explode('/',trim($route,'?')),-2,1)[0];
-            $action = array_slice(explode('/',trim($route,'?')),-1,1)[0];
-        }else{
-            $control = '';
-            $action = '';
-        }
-        $type = $type=='interface'?'interface':'script';
+        $route = strtolower($route);
+        $route_arr = explode('/',trim($route,'?'));
+        $control = array_slice($route_arr,-2,1)[0];
+        $action = array_slice($route_arr,-1,1)[0];
+//        $action = end($route_arr);
+//        array_pop($route_arr);
+//        $control = end($route_arr);
         $order_num = $order_num>9999?9999:$order_num;
 
         $data = [
@@ -50,12 +50,18 @@ class Authority extends  Common
             'remark'    =>  $remark,
             'order_num' =>  $order_num,
             'can_delete'    =>  $can_delete,
-            'type'      =>  $type,
+            'script_name'      =>  $script_name,
             'valid'     =>  $valid,
             'can_change'     =>  $can_change,
         ];
 
+
         $model = Loader::model('menu');
+        # 判断菜单名是否重复
+        $isExists = $model->where(['name'=>$name])->find();
+        if($isExists){
+            return $this->error_msg('菜单名称重复');
+        }
         if(!$menu_id){
             $data['menu_id'] = $this->md5_str_rand();
 
@@ -74,14 +80,13 @@ class Authority extends  Common
 
 
     /**
-     * 获取所有的权限列表
+     * 获取所有的权限菜单列表
      * @return \think\response\Json
      */
     public function getAllMenu(){
         $user_id = Request::instance()->param('user_id','','trim');
 
-
-        $result = Db('menu')->select();
+        $result = Db('menu')->field('menu_id,parent_id,name')->select();
         $result = $this->generate_tree_with_child($result,'menu_id');
         if($result){
             return $this->success_msg($result);
@@ -89,6 +94,78 @@ class Authority extends  Common
             return $this->success_msg(3);
         }
     }
+
+    /**
+     *
+     * 保存角色权限
+     * @return \think\response\Json
+     */
+    public function saveRoleAuth(){
+        $request = Request::instance();
+
+        $user_id =  $request->param('user_id','','trim');
+        $role_id =  $request->param('role_id','','trim');
+        $menu_ids = $request->param('menu_ids','','trim');
+        $id = $request->param('id','','trim');
+
+        $data = [
+            'role_id'   =>  $role_id,
+            'menu_id'   =>  $menu_ids
+        ];
+
+        $model = Loader::model('permission');
+
+        if($id){
+            $result = $model->save($data,['id'=>$id]);
+        }else{
+            $result = $model->save($data);
+        }
+
+        if($result){
+            return $this->success_msg(1);
+        }else{
+            return $this->error_msg(2);
+        }
+
+    }
+
+    /**
+     *
+     * 获取用户的菜单权限列表
+     * @return \think\response\Json
+     */
+    public function getUserMenu(){
+        $user_id = Request::instance()->param('user_id','','trim');
+
+        $result = Db::view('user','user_id')
+            ->view('role','role_id','user.role_id = role.role_id','left')
+            ->view('permission','menu_id','permission.role_id = role.role_id','left')
+            ->where(['user.user_id'=>$user_id])
+            ->select();
+
+        if(!$result){
+            return $this->success_msg(3);
+        }
+
+        $menu_ids = implode(array_column($result,'menu_id'),',');
+        $menus_result = Db('menu')->field('menu_id,parent_id,name,script_name,icon')
+            ->where(['menu_id'=>['in',$menu_ids]])
+            ->select();
+//        if(!$menus_result){
+//            return $this->success_msg(3);
+//        }
+//        dump($menus_result);
+        $result = $this->generate_tree_with_child($menus_result,'menu_id');
+//        dump($result);
+        if($result){
+            return $this->success_msg($result);
+        }else{
+            return $this->error_msg(2);
+        }
+
+    }
+
+
 
 
 }
