@@ -17,7 +17,7 @@ class User extends  Common
      */
     public function saveUser(){
         $request = Request::instance();
-        $user_id = $request->param('user_id','','trim');
+        $user_id = $request->param('uid','','trim');
         $user_name = $request->param('user_name','','trim');
         $password = $request->param('password','123456','trim');# 密码默认123456
         $role_id = $request->param('role_id','','trim');
@@ -121,7 +121,7 @@ class User extends  Common
      * @return \think\response\Json
      */
     public function delUser(){
-        $user_id = Request::instance()->param('user_id','','trim');
+        $user_id = Request::instance()->param('uid','','trim');
         if(!$user_id){
             return $this->error_msg('参数错误');
         }

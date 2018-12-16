@@ -77,7 +77,9 @@ class Organization extends Common
                 'organization_id'   =>  ['IN',$organization_ids],
                 'valid'             =>  1
             ];
-            $roleResult = Db('role')->field('role_id,organization_id,role_name,role_description')->where($where)->select();
+            $roleResult = Db::view('role','role_id,organization_id,role_name,role_description')
+                ->view('permission','menu_id','permission.role_id = role.role_id','left')
+                ->where($where)->select();
             if($roleResult){
                 foreach ($result as &$value){
                     $value['child'] = isset($value['child'])?$value['child']:[];

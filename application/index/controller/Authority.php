@@ -24,10 +24,11 @@ class Authority extends  Common
         $remark = $request->param('remark','','trim');
         $order_num = $request->param('order_num',9999,'intval');
         $can_delete = $request->param('can_delete',0,'intval');
-        $script_name = $request->param('script_name','','trim'); # 脚本名字
+        $url = $request->param('url','','trim'); # 前端路由
         $valid = $request->param('valid',1,'intval');
         $can_change = $request->param('change',1,'intval');  #是否有编辑权限(1有 0没有)
         $menu_id = $request->param('menu_id','','trim');
+        $type = $request->param('type','menu','trim');
 
         if(!$name){
             return $this->error_msg('参数错误');
@@ -50,19 +51,21 @@ class Authority extends  Common
             'remark'    =>  $remark,
             'order_num' =>  $order_num,
             'can_delete'    =>  $can_delete,
-            'script_name'      =>  $script_name,
+            'url'      =>  $url,
             'valid'     =>  $valid,
             'can_change'     =>  $can_change,
+            'type'     =>  $type,
         ];
 
 
         $model = Loader::model('menu');
-        # 判断菜单名是否重复
-        $isExists = $model->where(['name'=>$name])->find();
-        if($isExists){
-            return $this->error_msg('菜单名称重复');
-        }
+
         if(!$menu_id){
+            # 判断同级菜单名是否重复
+            $isExists = $model->where(['name'=>$name,'parent_id'=>$parent_id])->find();
+            if($isExists){
+                return $this->error_msg('同级中不能存在相同的名称');
+            }
             $data['menu_id'] = $this->md5_str_rand();
 
             $result = $model->save($data);
@@ -86,7 +89,7 @@ class Authority extends  Common
     public function getAllMenu(){
         $user_id = Request::instance()->param('user_id','','trim');
 
-        $result = Db('menu')->field('menu_id,parent_id,name')->select();
+        $result = Db('menu')->field('menu_id,parent_id,name,type,route,url')->select();
         $result = $this->generate_tree_with_child($result,'menu_id');
         if($result){
             return $this->success_msg($result);
@@ -147,8 +150,21 @@ class Authority extends  Common
             return $this->success_msg(3);
         }
 
-        $menu_ids = implode(array_column($result,'menu_id'),',');
-        $menus_result = Db('menu')->field('menu_id,parent_id,name,script_name,icon')
+//        $menu_ids = implode(array_column($result,'menu_id'),',');
+        # =====根据功能id 获取到其上级所有的菜单id start==
+        $menu_ids = explode(',',array_column($result,'menu_id')[0]);
+//        $menu_pid_map = [];
+//        $menu_result = Db('menu')->field('menu_id,parent_id')->select();
+//        if($menu_result){
+//            $map = array_column($menu_result,null,'menu_id');
+//            $result = $this->getIdAndPid($map,$menu_ids);
+//            dump($result);
+//        }
+
+        # =====根据功能id 获取到其上级所有的菜单id end==
+
+
+        $menus_result = Db('menu')->field('menu_id,parent_id,name,icon,type,url')
             ->where(['menu_id'=>['in',$menu_ids]])
             ->select();
 //        if(!$menus_result){
@@ -163,6 +179,29 @@ class Authority extends  Common
             return $this->error_msg(2);
         }
 
+    }
+
+
+    /**
+     * 查出ids中的id以及其父id以及其父id的父id......
+     * @param $map 以id为键, pid为值的 所有数据 的map
+     * @param $ids 要查找的ids
+     * @return array
+     */
+    function getIdAndPid(&$map, $ids){
+        $res = [];
+        foreach($ids as $id){
+            $this->joinPid($map, $id, $res);
+        }
+        return array_values(array_unique($res));
+    }
+
+    function joinPid(&$map, $id, &$res){
+        // 如果其pid不为0, 则继续查找
+        if(isset($map[$id]) && $map[$id]['parent_id'] != 0){
+            self::joinPid($map, $map[$id]['parent_id'], $res);
+        }
+        $res[] = $id;
     }
 
 

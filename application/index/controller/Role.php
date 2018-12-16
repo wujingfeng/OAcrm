@@ -27,6 +27,7 @@ class Role extends Common
         $organization_id    = $request->param('organization_id','','trim');#所属组织id
         $role_permission    = $request->param('role_permission','','trim');#所属拥有的权限(逗号拼接)
         $role_name          = $request->param('role_name','','trim');#角色名称
+        $menu_id          = $request->param('menu_id','','trim');#权限集合
         $role_description   = $request->param('description','','trim');#角色描述
 
         $data = [
@@ -36,18 +37,24 @@ class Role extends Common
             'role_permission'   =>  $role_permission
         ];
 
+        $permissionData = [
+            'role_id'   =>  $role_id,
+            'menu_id'   =>  $menu_id
+        ];
+
         #参数验证
         $result = $this->validate($data,'Role.saveRole');
         if($result !== true){
             return $this->error($result);
         }
         # ===== 最高组织下只能创建一个角色---超级管理员
-        if($organization_id == 'd41d8cd98f00b204e9800998ecf8427e'){
+        if(!$role_id && $organization_id == 'd41d8cd98f00b204e9800998ecf8427e'){
             $isexist = Db('role')->where(['organization_id'=>$organization_id])->find();
             if($isexist){
                 return $this->error_msg('最高机构下只允许存在超级管理员一个角色');
             }
         }
+
 
 
         # =====         鉴权 start                 ====
@@ -62,6 +69,7 @@ class Role extends Common
 //        dump($result);
 
         if($result){
+
             if($role_permission){
                 if($result['role_permission']){
                     $getPermission = explode(',',$role_permission);
@@ -81,19 +89,32 @@ class Role extends Common
 
         #保存
         $model = Loader::model('Role');
+        $permissionModel = Loader::model('permission');
 
-        $isExists = $model->where(['organization_id'=>$organization_id,'role_name'=>$role_name])->find();
-        if($isExists){
-            return $this->error_msg(7);
-        }
         if(!$role_id){
+
+            # 插入角色信息前,先判断是否存在同名角色
+            $isExists = $model->where(['organization_id'=>$organization_id,'role_name'=>$role_name])->find();
+            if($isExists){
+                return $this->error_msg(7);
+            }
+            # 保存角色信息
             $role_id = $this->md5_str_rand();
             $data['role_id'] = $role_id;
             $result = $model->save($data);
+
+            # 保存角色的权限信息
+            $permissionData['role_id'] = $role_id;
+            $p_result = $permissionModel->save($permissionData);
+
         }else{
+            #更新角色基本信息
             $result = $model->save($data,['role_id'=>$role_id]);
+            #更新角色权限信息
+            $p_result = $permissionModel->save($permissionData,['role_id'=>$role_id]);
+
         }
-        if($result){
+        if($result || $p_result){
             return $this->success_msg($role_id);
         }else{
             return $this->error_msg(2);
