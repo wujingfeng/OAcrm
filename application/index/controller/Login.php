@@ -12,6 +12,7 @@ namespace app\index\controller;
 
 
 
+use think\Controller;
 use think\Db;
 use think\Request;
 use think\Session;
@@ -56,8 +57,18 @@ class Login extends  Common
             $data = [
                 'user_id'       =>      $result['user_id'],
                 'user_name'     =>      $result['user_name'],
-                'token'         =>      $result['user_id']
             ];
+            # ====存入session 并返回session_Id作为token
+            Session::set('userInfo',$data);
+            $token = session_id();
+            $data['token'] = $token;
+
+            #===== 获取字典/菜单版本号(暂时用最大更新时间作版本号)
+            $dictResult = Db('dictionary')->field('modified')->order('modified desc')->find();
+            $menuResult = Db('menu')->field('modified')->order('modified desc')->find();
+            $data['dict_version'] = $dictResult['modified']?strtotime($dictResult['modified']):0;
+            $data['menu_version'] = $menuResult['modified']?strtotime($menuResult['modified']):0;
+
             return $this->success_msg($data);
         }else{
             return $this->error_msg(5);

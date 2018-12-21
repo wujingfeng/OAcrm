@@ -29,6 +29,7 @@ class Authority extends  Common
         $can_change = $request->param('change',1,'intval');  #是否有编辑权限(1有 0没有)
         $menu_id = $request->param('menu_id','','trim');
         $type = $request->param('type','menu','trim');
+        $icon = $request->param('icon','menu','trim');
 
         if(!$name){
             return $this->error_msg('参数错误');
@@ -55,6 +56,7 @@ class Authority extends  Common
             'valid'     =>  $valid,
             'can_change'     =>  $can_change,
             'type'     =>  $type,
+            'icon'     =>  $icon,
         ];
 
 
@@ -89,7 +91,7 @@ class Authority extends  Common
     public function getAllMenu(){
         $user_id = Request::instance()->param('user_id','','trim');
 
-        $result = Db('menu')->field('menu_id,parent_id,name,type,route,url')->select();
+        $result = Db('menu')->field('menu_id,parent_id,name,type,route,url,icon,order_num')->order('order_num')->select();
         $result = $this->generate_tree_with_child($result,'menu_id');
         if($result){
             return $this->success_msg($result);
@@ -154,25 +156,23 @@ class Authority extends  Common
         # =====根据功能id 获取到其上级所有的菜单id start==
         $menu_ids = explode(',',array_column($result,'menu_id')[0]);
 //        $menu_pid_map = [];
-//        $menu_result = Db('menu')->field('menu_id,parent_id')->select();
-//        if($menu_result){
-//            $map = array_column($menu_result,null,'menu_id');
-//            $result = $this->getIdAndPid($map,$menu_ids);
-//            dump($result);
-//        }
+        $menu_result = Db('menu')->field('menu_id,parent_id')->select();
+        if($menu_result){
+            $map = array_column($menu_result,null,'menu_id');
+            $menu_ids = $this->getIdAndPid($map,$menu_ids);
+        }
 
         # =====根据功能id 获取到其上级所有的菜单id end==
 
 
         $menus_result = Db('menu')->field('menu_id,parent_id,name,icon,type,url')
             ->where(['menu_id'=>['in',$menu_ids]])
+            ->order('order_num')
             ->select();
-//        if(!$menus_result){
-//            return $this->success_msg(3);
-//        }
-//        dump($menus_result);
+        if(!$menus_result){
+            return $this->success_msg(3);
+        }
         $result = $this->generate_tree_with_child($menus_result,'menu_id');
-//        dump($result);
         if($result){
             return $this->success_msg($result);
         }else{
@@ -196,9 +196,9 @@ class Authority extends  Common
         return array_values(array_unique($res));
     }
 
-    function joinPid(&$map, $id, &$res){
+    static function joinPid($map, $id, &$res){
         // 如果其pid不为0, 则继续查找
-        if(isset($map[$id]) && $map[$id]['parent_id'] != 0){
+        if(isset($map[$id]) && $map[$id]['parent_id'] !== 0){
             self::joinPid($map, $map[$id]['parent_id'], $res);
         }
         $res[] = $id;
