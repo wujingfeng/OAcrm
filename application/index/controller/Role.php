@@ -151,9 +151,8 @@ class Role extends Common
     }
 
     public function getMenuList(){
-        $user_id = Request::instance()->param('user_id','','trim');
 
-
+echo 1;
 
 
 

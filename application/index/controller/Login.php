@@ -17,7 +17,7 @@ use think\Db;
 use think\Request;
 use think\Session;
 
-class Login extends  Common
+class Login extends  Controller
 {
     public function index(){
 
@@ -58,21 +58,58 @@ class Login extends  Common
                 'user_id'       =>      $result['user_id'],
                 'user_name'     =>      $result['user_name'],
             ];
+
             # ====存入session 并返回session_Id作为token
-            Session::set('userInfo',$data);
+            Session::set($result['user_id'],$data);
             $token = session_id();
             $data['token'] = $token;
+
+//            $has = Session::has($result['user_id']);
+//            dump($has);
+//            if($has){
+//                $userInfo = Session::get($result['user_id']);
+//                $data = $userInfo;
+//            }else{
+//                echo 333;
+//                $token = session_id();
+//                $data['token'] = $token;
+//                Session::set($result['user_id'],$data);
+//            }
+//            $userInfo = Session::get($result['user_id']);
+//            dump($userInfo);
+
+
+
 
             #===== 获取字典/菜单版本号(暂时用最大更新时间作版本号)
             $dictResult = Db('dictionary')->field('modified')->order('modified desc')->find();
             $menuResult = Db('menu')->field('modified')->order('modified desc')->find();
+             # 如果权限分配方式也更改了  则也需要修改版本号
+            $permission = Db('permission')->field('modified')->order('modified desc')->find();
             $data['dict_version'] = $dictResult['modified']?strtotime($dictResult['modified']):0;
-            $data['menu_version'] = $menuResult['modified']?strtotime($menuResult['modified']):0;
+            $menu_version = $menuResult['modified']?strtotime($menuResult['modified']):0;
+            $perm_version = $permission['modified']?strtotime($permission['modified']):0;
+            $data['menu_version'] = (int)$menu_version+(int)$perm_version;
 
-            return $this->success_msg($data);
+            return json_encode(['status'=>'success','message'=>$data]);
         }else{
-            return $this->error_msg(5);
+            return json_encode(['status'=>'failed','message'=>'登录失败,账号密码不正确']);
         }
+
+    }
+
+
+    /**
+     * 退出登录
+     * @return \think\response\Json
+     */
+    public function loginOut(){
+        $user_id = Request::instance()->param('user_id','','trim');
+        if(!$user_id){
+            return $this->error_msg('参数错误');
+        }
+        Session::delete('userInfo.'.$user_id);
+        return $this->success_msg('退出成功');
 
     }
 

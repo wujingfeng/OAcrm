@@ -29,55 +29,78 @@ class Common extends Controller
      * 鉴权
      * @return bool|\think\response\Json|void
      */
-    public function _initialize(){
+        public function _initialize(){
+            # 检测登录状态
+            $this->checkLogin();
+
+    }
+//    public function _initialize(){
+//        $request = Request::instance();
+//        $user_id = $request->param('user_id','958ee617b386f6c4b052e6ecce51d39c','trim');
+//        $token = $request->param('token','','trim');
+//        $isUpdate = $request->param('isUpdate','','trim'); # 是否是更新操作,更新操作传任意值即可
+//        $module = $request->module();
+//        $control= $request->controller();
+//        $action = $request->action();
+//
+//        $route = $module.'/'.$control.'/'.$action;
+//        $route = strtolower($route);
+//        if($route == 'index/login/login'){
+//            return true; # 登录接口不检测权限
+//        }
+////        dump($route);
+//        if(!$user_id){
+//            return $this->error_msg('参数错误');
+//        }
+//        $sid = Session::get('userInfo');
+//        $menu_result = Db::view('user','user_id')
+//            ->view('role','role_id','user.role_id = role.role_id','left')
+//            ->view('permission','menu_id','permission.role_id = role.role_id','left')
+//            ->where(['user.user_id'=>$user_id])
+//            ->select();
+//
+//        # 先获取菜单权限列表
+//        # 如果这里查询不到结果,则直接判断无权限操作
+//        if(!$menu_result){
+//            return $this->error('非法操作,正在跳转'); #
+//        }
+//
+//        # 通过菜单权限列表和路由双重判定是否有操作权限
+//        $menus = array_column($menu_result,'menu_id')[0];
+//        $where = [
+//            'menu_id'   =>  ['in',$menus],
+//            'route'     =>  ['LIKE',"%$route%"]
+//        ];
+//        # 如果是更新操作,则需要判断该用户是否有编辑权限
+//        if($isUpdate){
+//            $where['can_change']    =   1;
+//        }
+//
+//        $isExists = Db('menu')->where($where)->fetchSql(true)->find();
+//
+//        # 能查询到,则表明有权限
+//        if($isExists){
+//            return true;
+//        } else{
+//            //return $this->error('用户非法操作,正在跳转到登录页');
+//        }
+//    }
+
+    /**
+     * 检测登录状态
+     * @return \think\response\Json
+     */
+    public function checkLogin(){
         $request = Request::instance();
-        $user_id = $request->param('user_id','958ee617b386f6c4b052e6ecce51d39c','trim');
+        $user_id = $request->param('user_id','','trim');
         $token = $request->param('token','','trim');
-        $isUpdate = $request->param('isUpdate','','trim'); # 是否是更新操作,更新操作传任意值即可
-        $module = $request->module();
-        $control= $request->controller();
-        $action = $request->action();
-
-        $route = $module.'/'.$control.'/'.$action;
-        $route = strtolower($route);
-        if($route == 'index/login/login'){
-            return true; # 登录接口不检测权限
-        }
-//        dump($route);
         if(!$user_id){
-            return $this->error_msg('参数错误');
+            return self::error_msg('参数错误');
         }
-        $sid = Session::get('userInfo');
-        $menu_result = Db::view('user','user_id')
-            ->view('role','role_id','user.role_id = role.role_id','left')
-            ->view('permission','menu_id','permission.role_id = role.role_id','left')
-            ->where(['user.user_id'=>$user_id])
-            ->select();
-
-        # 先获取菜单权限列表
-        # 如果这里查询不到结果,则直接判断无权限操作
-        if(!$menu_result){
-            return $this->error('非法操作,正在跳转'); #
-        }
-
-        # 通过菜单权限列表和路由双重判定是否有操作权限
-        $menus = array_column($menu_result,'menu_id')[0];
-        $where = [
-            'menu_id'   =>  ['in',$menus],
-            'route'     =>  ['LIKE',"%$route%"]
-        ];
-        # 如果是更新操作,则需要判断该用户是否有编辑权限
-        if($isUpdate){
-            $where['can_change']    =   1;
-        }
-
-        $isExists = Db('menu')->where($where)->fetchSql(true)->find();
-
-        # 能查询到,则表明有权限
-        if($isExists){
-            return true;
-        } else{
-            //return $this->error('用户非法操作,正在跳转到登录页');
+        $userInfo = Session::get($user_id);
+        if(!$userInfo ){
+            echo $this->error_msg('登录已过期,请重新登录');
+            exit();
         }
     }
 
