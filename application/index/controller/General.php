@@ -112,20 +112,29 @@ class General extends Common
         $type = Request::instance()->param('type','staff','trim');
 
         $type_map = [
+            # 修改人员状态
             'staff' =>  [
                 'staff_card', # 模型名
                 'id',    # 查询的字段
                 'status' # 修改的字段
             ],
+            # 修改需求状态
             'demand'=>  [
                 'company_demand',
                 'demand_id',
                 'customer_type'
             ],
+            # 修改匹配状态
             'match' =>  [
                 'match',
                 'match_id',
                 'status'
+            ],
+            # 财务审核
+            'match' =>  [
+                'match',
+                'match_id',
+                'valid'
             ]
         ];
 

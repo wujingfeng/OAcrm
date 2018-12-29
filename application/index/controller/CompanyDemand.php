@@ -606,10 +606,22 @@ class CompanyDemand extends Common
         if(!$match_id){
             return $this->error_msg('参数异常');
         }
-
+        $financial = Config::get('parameter.financial_audit_status');
+        # 如果修改的状态不需要财务审核,则直接判断状态修改真实有效,否则需要财务审核
+        if(in_array($status,$financial)){
+            $saveData = [
+                'status'=>$status,
+                'valid'=>0
+            ];
+        }else{
+            $saveData = [
+                'status'=>$status,
+                'valid'=>1
+            ];
+        }
         # 更新配对表中的状态
         $matchModel = Loader::model('match');
-        $result = $matchModel->save(['status'=>$status],['match_id'=>$match_id]);
+        $result = $matchModel->save($saveData,['match_id'=>$match_id]);
 
         if($has_detail){
             $data = [
@@ -637,9 +649,43 @@ class CompanyDemand extends Common
             return $this->error_msg(2);
         }
 
+    }
+
+    /**
+     * 获取审核列表
+     * @return \think\response\Json
+     */
+    public function financialAuditList(){
+        $request = Request::instance();
+        $page = $request->param('page',1,'intval');
+        $rows = $request->param('rows',10,'intval');
+        $begin_item = ($page-1)*$rows;
+
+        $financial = Config::get('parameter.financial_audit_status');
+        $where = [
+            'match.status'  =>  ['in',$financial]
+        ];
+        $result = Db::view('match','match_id,status,paid,unpaid')
+            ->view('match_detail','this_paid,transfer_way,transfer_message,company_account,staff_notice_time,demand_over_time,received_time','match.match_id = match_detail.match_id','left')
+            ->view('demand_cards','company_price','match.demand_card_id = demand_cards.id','left')
+            ->view('company_demand','company_name,due_time','company_demand.demand_id = demand_cards.demand_id','left')
+//            ->view('staff_cards','level,profession,register,other_card,talent_price,year','match.staff_card_id = staff_cards.id','left')
+//            ->view('staff','name,three_category','staff.staff_id = staff_cards.staff_id','left')
+            ->view('user','user_name','staff.user_id = user.user_id','left')
+            ->where($where)
+            ->limit($begin_item,$rows)
+            ->select();
+        $count = Db::view('match','match_id')
+            ->view('match_detail','id','match.match_id = match_detail.match_id','left')
+            ->where($where)
+            ->count();
+        if($result){
+            return $this->success_msg($result,$count);
+        }else{
+            return $this->success_msg(3);
+        }
 
 
     }
-
 
 }
