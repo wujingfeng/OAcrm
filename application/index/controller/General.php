@@ -131,9 +131,9 @@ class General extends Common
                 'status'
             ],
             # 财务审核
-            'match' =>  [
-                'match',
-                'match_id',
+            'audio' =>  [
+                'match_detail',
+                'id',
                 'valid'
             ]
         ];

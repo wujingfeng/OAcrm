@@ -663,14 +663,15 @@ class CompanyDemand extends Common
 
         $financial = Config::get('parameter.financial_audit_status');
         $where = [
-            'match.status'  =>  ['in',$financial]
+            'match.status'  =>  ['in',$financial],
+            'match_detail.valid'         =>  0
         ];
         $result = Db::view('match','match_id,status,paid,unpaid')
-            ->view('match_detail','this_paid,transfer_way,transfer_message,company_account,staff_notice_time,demand_over_time,received_time','match.match_id = match_detail.match_id','left')
+            ->view('match_detail','id,this_paid,transfer_way,transfer_message,company_account,staff_notice_time,demand_over_time,received_time','match.match_id = match_detail.match_id','left')
             ->view('demand_cards','company_price','match.demand_card_id = demand_cards.id','left')
             ->view('company_demand','company_name,due_time','company_demand.demand_id = demand_cards.demand_id','left')
-//            ->view('staff_cards','level,profession,register,other_card,talent_price,year','match.staff_card_id = staff_cards.id','left')
-//            ->view('staff','name,three_category','staff.staff_id = staff_cards.staff_id','left')
+            ->view('staff_cards','level,profession,register,other_card,talent_price,year','match.staff_card_id = staff_cards.id','left')
+            ->view('staff','name,three_category','staff.staff_id = staff_cards.staff_id','left')
             ->view('user','user_name','staff.user_id = user.user_id','left')
             ->where($where)
             ->limit($begin_item,$rows)
