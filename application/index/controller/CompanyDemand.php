@@ -35,7 +35,7 @@ class CompanyDemand extends Common
         $company_type  =   $request->param('company_type','','trim'); # 企业类型
         $return_visit   =   $request->param('return_visit','','trim');  #是否回访
         $time_visit     =   $request->param('time_visit','','trim');    # 回访时间(如需回访,则时间必填)
-        $due_time     =   $request->param('duetime','','trim');    # 合同到期时间
+        $due_time     =   $request->param('due_time','','trim');    # 合同到期时间
         $other_card     =   $request->param('other_card/a',[]); # 其他证件(数组)
         $taxes         =   $request->param('taxes','0','trim');   # 税金
         $referee=  $request->param('referee','','trim'); # 推荐人
@@ -561,7 +561,7 @@ class CompanyDemand extends Common
         $where = [
             'match.demand_id'=>$demand_id
         ];
-        $result = Db::view('match','match_id,status,paid,unpaid')
+        $result = Db::view('match','match_id,status,paid,unpaid,valid')
             ->view('demand_cards','company_price','match.demand_card_id = demand_cards.id','left')
             ->view('company_demand','company_name,due_time','company_demand.demand_id = demand_cards.demand_id','left')
             ->view('staff_cards','level,profession,register,other_card,talent_price,year','match.staff_card_id = staff_cards.id','left')
@@ -569,12 +569,26 @@ class CompanyDemand extends Common
             ->view('user','user_name','staff.user_id = user.user_id','left')
             ->where($where)
             ->select();
-
+        $logResult = Db('match_detail_log')->field('match_id,message')->where(['type'=>'staff'])->select();
+        $logMap = [];
+        if($logResult){
+            foreach($logResult as $log){
+                $logMap[$log['match_id']][] = $log['message'];
+            }
+        }
         if($result){
-//            foreach ($result as &$re){
-//                $re['unpaid'] = $re['company_price']-$re['paid'];
-//                unset($re);
-//            }
+            $logMapKeys = array_keys($logMap);
+            foreach ($result as &$re){
+                if(in_array($re['match_id'],$logMapKeys)){
+                    $re['logs'] = $logMap[$re['match_id']];
+                }else{
+                    $re['logs'] = [];
+                }
+                if($re['valid'] == 2){
+                    $re['status'] ='驳回';
+                }
+                unset($re);
+            }
             return $this->success_msg($result);
         }else{
             return $this->error_msg(1);
@@ -591,6 +605,7 @@ class CompanyDemand extends Common
         $request = Request::instance();
 
         $id = $request->param('id','','intval');
+        $user_id = $request->param('user_id','','trim');
         $match_id = $request->param('match_id','','trim');
         $status = $request->param('status','','trim');
 
@@ -623,6 +638,20 @@ class CompanyDemand extends Common
         $matchModel = Loader::model('match');
         $result = $matchModel->save($saveData,['match_id'=>$match_id]);
 
+        # 查询字典对应的名称,用于写入日志
+        $find_dict_name_list = [];
+        $transfer_way?array_push($find_dict_name_list,$transfer_way):'';
+        $company_account?array_push($find_dict_name_list,$company_account):'';
+        $status?array_push($find_dict_name_list,$status):'';
+
+        # 查询操作者名字
+        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
+        $user_name = $user['user_name'];
+        $dict_result = Db('dictionary')->field('dictionary_id,name')->where(['dictionary_id'=>['in',$find_dict_name_list]])->select();
+        $dict_map = array_column($dict_result,'name','dictionary_id');
+        $logMsg = $user_name.'于'.date('Y-m-d H:i:s',time()).'将状态修改为:'.$dict_map[$status].'。';
+
+
         if($has_detail){
             $data = [
                 'match_id'  =>  $match_id,
@@ -638,11 +667,39 @@ class CompanyDemand extends Common
             $detailModel = Loader::model('match_detail');
             if(!$id){
                 $result = $detailModel->save($data);
+                $id = $detailModel->id;
             }else{
                 $result = $detailModel->save($data,['id'=>$id]);
             }
-        }
 
+            # 将配对信息写入日志表
+
+
+
+            $match_detail_remark = Config::get('parameter.match_detail_remark');
+            $remark_keys = array_keys($match_detail_remark);
+            $data_keys = array_keys($data);
+            foreach($data_keys as $dkeys){
+                if(in_array($dkeys,$remark_keys) && $data[$dkeys]){
+                    if(in_array($data[$dkeys],$find_dict_name_list)){
+                        $logMsg .= $match_detail_remark[$dkeys].$dict_map[$data[$dkeys]].'。';
+                    }else{
+                        $logMsg .= $match_detail_remark[$dkeys].$data[$dkeys].'。';
+                    }
+                }
+            }
+
+        }
+        $model = Loader::model('match_log');
+        $logData = [
+            'match_id'          =>  $match_id,
+            'user_id'           =>  $user_id,
+            'message'           =>  $logMsg,
+            'status'            =>  $status,
+            'type'              =>  'staff'
+        ];
+
+        $model->save($logData);
         if($result){
             return $this->success_msg(1);
         }else{
@@ -664,7 +721,7 @@ class CompanyDemand extends Common
         $financial = Config::get('parameter.financial_audit_status');
         $where = [
             'match.status'  =>  ['in',$financial],
-            'match_detail.valid'         =>  0
+            'match.valid'         =>  0
         ];
         $result = Db::view('match','match_id,status,paid,unpaid')
             ->view('match_detail','id,this_paid,transfer_way,transfer_message,company_account,staff_notice_time,demand_over_time,received_time','match.match_id = match_detail.match_id','left')
@@ -686,7 +743,38 @@ class CompanyDemand extends Common
             return $this->success_msg(3);
         }
 
+    }
 
+
+    public function finacialAudio(){
+        $id = Request::instance()->param('id','','trim'); #
+        $matcch_id = Request::instance()->param('matcch_id','','trim'); #
+        $status = Request::instance()->param('status','','trim');
+        $user_id = Request::instance()->param('user_id','','trim');
+
+        if(!$id){
+            return $this->error_msg('参数错误');
+        }
+
+        $model = Loader::model('');
+
+        # 查询操作者名字
+        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
+        $user_name = $user['user_name'];
+        if($status==1){
+            $logMsg = '财务审核员('.$user_name.')的审核结果为:通过';
+        }else{
+            $logMsg = '财务审核员('.$user_name.')的审核结果为:驳回';
+        }
+        $model = Loader::model('match_log');
+
+        $data = [
+            'match_id'          =>  $id,
+            'user_id'           =>  $user_id,
+            'message'           =>  $logMsg,
+            'type'              =>  'staff'
+        ];
+        $model->save($data);
     }
 
 }

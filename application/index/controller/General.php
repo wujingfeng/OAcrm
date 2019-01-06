@@ -109,6 +109,7 @@ class General extends Common
     public function changeStatus(){
         $id = Request::instance()->param('id','','trim'); # 字符串1,2,3,4
         $status = Request::instance()->param('status','','trim');
+        $user_id = Request::instance()->param('user_id','','trim');
         $type = Request::instance()->param('type','staff','trim');
 
         $type_map = [
@@ -129,12 +130,6 @@ class General extends Common
                 'match',
                 'match_id',
                 'status'
-            ],
-            # 财务审核
-            'audio' =>  [
-                'match_detail',
-                'id',
-                'valid'
             ]
         ];
 
@@ -146,14 +141,13 @@ class General extends Common
         $status_type = $type_map[$type][2];
 //        $type = $type =='staff'?'staff_card':'demand_card';
 
-
-
         if(!$id){
             return $this->error_msg('参数错误');
         }
         $model = Loader::model($model);
 
         $result = $model->save([$status_type=>$status],[$pk=>['IN',$id]]);
+
 
         if($result){
             return $this->success_msg(1);

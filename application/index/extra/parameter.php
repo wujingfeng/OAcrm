@@ -69,6 +69,17 @@ return [
         'edf108e7fc2de67a034f78e8a34d2929',
         '95968ebf1fab68619e54a00d2bbe768d',
         '7afd62834ae2218e104d2933947e96c0',
+    ],
+
+    # 配对详情字段备注信息(用于写入配对日志使用)
+    'match_detail_remark'       =>[
+        'this_paid'  =>  '本次付款金额(单位:元)为:',
+        'transfer_way'  =>  '支付方式为:',
+//        'transfer_message'  =>  '转账方信息',
+        'company_account'  =>  '公司账号为:',
+        'staff_notice_time'  =>  '修改人才公示时间为:',
+//        'demand_over_time'  =>  '合同/订单过期时间',
+        'received_time'  =>  '预计到账时间为:',
     ]
 
 
