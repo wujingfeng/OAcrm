@@ -35,7 +35,7 @@ class General extends Common
         if(!$type_id){
             return $this->error_msg('缺少参数');
         }
-        $type = $type== 'staff'?'staff':'demand';
+//        $type = $type== 'staff'?'staff':'demand';
 
         $data = [];
 

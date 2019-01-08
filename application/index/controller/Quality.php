@@ -31,7 +31,6 @@ class Quality extends Common
         $landline_phone  =       $request->param('landline_phone','','trim'); # 座机电话号码
         $qq         =       $request->param('qq','','trim');    # qq号
         $customer_type  =   $request->param('customer_type','','trim'); # 客户类型
-        $company_type  =   $request->param('company_type','','trim'); # 企业类型
         $return_visit   =   $request->param('return_visit','','trim');  #是否回访
         $time_visit     =   $request->param('time_visit','','trim');    # 回访时间(如需回访,则时间必填)
         $due_time     =   $request->param('due_time','','trim');    # 合同到期时间
@@ -74,7 +73,7 @@ class Quality extends Common
         ];
 
 //        dump($data);
-        $result = $this->validate($data,'Demand.saveDemand');
+        $result = $this->validate($data,'Quality.saveQuality');
         if($result !== true){
             return $this->error_msg($result);
         }
@@ -82,7 +81,6 @@ class Quality extends Common
         $data['qq'] =  $qq;
 //        $data['year'] =  $year;
         $data['customer_place'] =  $customer_place;
-        $data['company_type'] =  $company_type;
         $data['link_address'] =  $link_address;
         $data['taxes'] =  $taxes;
         $data['referee'] =  $referee;
@@ -147,17 +145,14 @@ class Quality extends Common
      * 获取需求列表
      * @return \think\response\Json
      */
-    public function getDemandList()
+    public function getQualityList()
     {
         $request = Request::instance();
 
         $user_id = $request->param('user_id', '', 'trim');
         $customer_name = $request->param('customer_name','','trim');
         $customer_place = $request->param('customer_place','','trim');
-        $three_category = $request->param('three_category','','trim');
-        $bid_type = $request->param('bid_type','','trim');
         $customer_type = $request->param('customer_type','','trim');
-        $duty = $request->param('duty','','trim');
         $year = $request->param('year','','trim');
         $level = $request->param('level','','trim');
         $profession = $request->param('profession','','trim');
@@ -180,35 +175,26 @@ class Quality extends Common
             }
         }
         #====== 编辑where条件 start
-        $where['company_demand.user_id'] = ['IN',$users];
+        $where['quality.user_id'] = ['IN',$users];
 
         if($customer_name){
-            $where['company_demand.customer_name'] = ['LIKE',"%$customer_name%"];
+            $where['quality.customer_name'] = ['LIKE',"%$customer_name%"];
         }
         if($customer_place){
-            $where['company_demand.customer_place'] = $customer_place;
-        }
-        if($three_category){
-            $where['demand_cards.three_category'] = $three_category;
-        }
-        if($bid_type){
-            $where['demand_cards.bid_type'] = $bid_type;
+            $where['quality.customer_place'] = $customer_place;
         }
         if($customer_type){
-            $where['company_demand.customer_type'] = $customer_type;
-        }
-        if($duty){
-            $where['demand_cards.duty'] = $duty;
+            $where['quality.customer_type'] = $customer_type;
         }
         if($year){
-            $where['demand_cards.year'] = $year;
+            $where['quality_cards.year'] = $year;
         }
 
         if($profession){
-            $where['demand_cards.profession'] = $profession;
+            $where['quality_cards.profession'] = $profession;
         }
         if($level){
-            $where['demand_cards.level'] = $level;
+            $where['quality_cards.level'] = $level;
         }
 
         #====== 编辑where条件 end
@@ -216,16 +202,16 @@ class Quality extends Common
 //        $dict_map = $this->dict_id_map();
 //        $dict_map = json_decode($dict_map,true);
 //        $field_cfg = Config::get('parameter.demand_field_cfg');
-        $demand_result = Db::view('company_demand','*')
-            ->view('demand_cards','*','company_demand.quality_id = demand_cards.quality_id','left')
-            ->view('user','user_name','user.user_id = company_demand.user_id','left')
+        $demand_result = Db::view('quality','*')
+            ->view('quality_cards','*','quality.quality_id = quality_cards.quality_id','left')
+            ->view('user','user_name','user.user_id = quality.user_id','left')
             ->where($where)
-            ->order('company_demand.modified desc')
+            ->order('quality.modified desc')
             ->limit($begin_item,$rows)
             ->select();
-        $demand_count = Db::view('company_demand','quality_id')
-            ->view('demand_cards','id as sid','company_demand.quality_id = demand_cards.quality_id','inner')
-            ->view('user','user_name','user.user_id = company_demand.user_id','left')
+        $demand_count = Db::view('quality','quality_id')
+            ->view('quality_cards','id as sid','quality.quality_id = quality_cards.quality_id','inner')
+            ->view('user','user_name','user.user_id = quality.user_id','left')
             ->where($where)
             ->select();
 
@@ -259,22 +245,22 @@ class Quality extends Common
             }
                 #====查询附件  生成附件与需求的映射关系 end
 
-                #====查询已匹配人员  生成匹配与人员证件映射关系 start
-            $match_id_map = [];
-            $match_id_list = [];
-            $matchRes = Db::view('match','match_id,quality_id,staff_id')
-                ->view('demand_cards','id as demand_card_id','match.demand_card_id = demand_cards.id','left')
-                ->view('staff_cards','id as staff_card_id,*','match.staff_card_id = staff_cards.id','left')
-                ->view('staff','name','staff_cards.staff_id = staff.staff_id','left')
-                ->where(['demand_card_id'=>['in',$demand_card_id_list]])
-                ->select();
-            if($matchRes){
-                foreach($matchRes as $m){
-                    $match_id_list[] = $m['demand_card_id'];
-                    $match_id_map[$m['demand_card_id']][] = $m;
-                }
-            }
-                #====查询已匹配人员  生成匹配与人员证件映射关系 end
+//                #====查询已匹配人员  生成匹配与人员证件映射关系 start
+//            $match_id_map = [];
+//            $match_id_list = [];
+//            $matchRes = Db::view('match','match_id,quality_id,staff_id')
+//                ->view('quality_cards','id as demand_card_id','match.demand_card_id = quality_cards.id','left')
+//                ->view('staff_cards','id as staff_card_id,*','match.staff_card_id = staff_cards.id','left')
+//                ->view('staff','name','staff_cards.staff_id = staff.staff_id','left')
+//                ->where(['demand_card_id'=>['in',$demand_card_id_list]])
+//                ->select();
+//            if($matchRes){
+//                foreach($matchRes as $m){
+//                    $match_id_list[] = $m['demand_card_id'];
+//                    $match_id_map[$m['demand_card_id']][] = $m;
+//                }
+//            }
+//                #====查询已匹配人员  生成匹配与人员证件映射关系 end
 
             foreach ($demand_result as &$item){
 
@@ -284,12 +270,12 @@ class Quality extends Common
                 if(in_array($item['quality_id'],$file_id_list)){
                     $item['path'] = $file_id_map[$item['quality_id']];
                 }
-                # 追加已匹配人员数据
-                if(in_array($item['id'],$match_id_list)){
-                    $item['match'] = $match_id_map[$item['id']];
-                }else{
-                    $item['match'] = '';
-                }
+//                # 追加已匹配人员数据
+//                if(in_array($item['id'],$match_id_list)){
+//                    $item['match'] = $match_id_map[$item['id']];
+//                }else{
+//                    $item['match'] = '';
+//                }
 
                 if($item['customer_place']){
 
@@ -365,7 +351,7 @@ class Quality extends Common
         }
 
         # 获取需要的人才总数
-        $needed_result = Db('demand_cards')
+        $needed_result = Db('quality_cards')
             ->field('sum(needed_number) as need')
             ->where(['quality_id'=>$quality_id])
             ->group('quality_id')
@@ -438,23 +424,23 @@ class Quality extends Common
         }
 
         #====== 编辑where条件 start
-        $where['company_demand.user_id'] = ['IN',$users];
+        $where['quality.user_id'] = ['IN',$users];
 
         #====== 编辑where条件 end
         #=====开始查询需求信息
         $demand_result = Db::view('match','match_id,quality_id,staff_id,staff_card_id,paid,unpaid,staff_id')
-            ->view('demand_cards','number_needed,company_price','match.demand_card_id = demand_cards.id','left')
-            ->view('company_demand','customer_name,customer_place,user_id,demand_status,created,due_time','company_demand.quality_id = demand_cards.quality_id','left')
+            ->view('quality_cards','number_needed,company_price','match.demand_card_id = quality_cards.id','left')
+            ->view('quality','customer_name,customer_place,user_id,demand_status,created,due_time','quality.quality_id = quality_cards.quality_id','left')
             ->view('staff','name as staff_name','staff.staff_id = match.staff_id','left')
-            ->view('user','user_name','user.user_id = company_demand.user_id','left')
+            ->view('user','user_name','user.user_id = quality.user_id','left')
             ->where($where)
             ->limit($begin_item,$rows)
             ->select();
 
         $demand_count = Db::view('match','match_id')
-            ->view('demand_cards','id','match.demand_card_id = demand_cards.id','left')
-            ->view('company_demand','quality_id','company_demand.quality_id = demand_cards.quality_id','left')
-            ->view('user','user_name','user.user_id = company_demand.user_id','left')
+            ->view('quality_cards','id','match.demand_card_id = quality_cards.id','left')
+            ->view('quality','quality_id','quality.quality_id = quality_cards.quality_id','left')
+            ->view('user','user_name','user.user_id = quality.user_id','left')
             ->where($where)
             ->select();
 
@@ -475,7 +461,7 @@ class Quality extends Common
                 $demand_list_page[] = $d['quality_id'];
 //                $staff_card_list_page[] = $d['staff_card_id'];
             }
-            $res = Db('demand_cards')
+            $res = Db('quality_cards')
                 ->field('quality_id,SUM(number_needed) as number_needed,SUM(company_price) as company_price')
                 ->where(['quality_id'=>['in',$demand_list_page]])
                 ->group('quality_id')
@@ -551,8 +537,8 @@ class Quality extends Common
             'match.quality_id'=>$quality_id
         ];
         $result = Db::view('match','match_id,status,paid,unpaid,valid')
-            ->view('demand_cards','company_price','match.demand_card_id = demand_cards.id','left')
-            ->view('company_demand','customer_name,due_time','company_demand.quality_id = demand_cards.quality_id','left')
+            ->view('quality_cards','company_price','match.demand_card_id = quality_cards.id','left')
+            ->view('quality','customer_name,due_time','quality.quality_id = quality_cards.quality_id','left')
             ->view('staff_cards','level,profession,register,other_card,talent_price,year','match.staff_card_id = staff_cards.id','left')
             ->view('staff','name,three_category','staff.staff_id = staff_cards.staff_id','left')
             ->view('user','user_name','staff.user_id = user.user_id','left')
@@ -714,8 +700,8 @@ class Quality extends Common
         ];
         $result = Db::view('match','match_id,status,paid,unpaid')
             ->view('match_detail','id,this_paid,transfer_way,transfer_message,company_account,staff_notice_time,demand_over_time,received_time','match.match_id = match_detail.match_id','left')
-            ->view('demand_cards','company_price','match.demand_card_id = demand_cards.id','left')
-            ->view('company_demand','customer_name,due_time','company_demand.quality_id = demand_cards.quality_id','left')
+            ->view('quality_cards','company_price','match.demand_card_id = quality_cards.id','left')
+            ->view('quality','customer_name,due_time','quality.quality_id = quality_cards.quality_id','left')
             ->view('staff_cards','level,profession,register,other_card,talent_price,year','match.staff_card_id = staff_cards.id','left')
             ->view('staff','name,three_category','staff.staff_id = staff_cards.staff_id','left')
             ->view('user','user_name','staff.user_id = user.user_id','left')
