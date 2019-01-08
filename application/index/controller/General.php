@@ -125,6 +125,12 @@ class General extends Common
                 'demand_id',
                 'customer_type'
             ],
+            # 修改需求状态
+            'quality'=>  [
+                'quality_cards',
+                'quality_id',
+                'customer_type'
+            ],
             # 修改匹配状态
             'match' =>  [
                 'match',
