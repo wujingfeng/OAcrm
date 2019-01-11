@@ -36,7 +36,7 @@ class Quality extends Common
         $due_time     =   $request->param('due_time','','trim');    # 合同到期时间
         $taxes         =   $request->param('taxes','0','trim');   # 税金
         $referee=  $request->param('referee','','trim'); # 推荐人
-        $type=  $request->param('type','','intval'); # 收/出资质(1:收资质,2:出资质)
+        $type=  $request->param('type',1,'intval'); # 收/出资质(1:收资质,2:出资质)
         $type = $type==1?1:2;
 //        $cards          =   $request->param('cards','[{"quality_type":"0a8add783c7ca4eed388ec03877d7a71","level":"0a8add783c7ca4eed388ec03877d7a76","profession":"034535aa5e9824eadfa3eecc233fb73f","number_needed":2,"company_price":10000,"year":1,"is_sc":2,"split":1},{"quality_type":"0a8add783c7ca4eed388ec03877d7a71","level":"0a8add783c7ca4eed388ec03877d7a76","profession":"034535aa5e9824eadfa3eecc233fb73f","number_needed":2,"company_price":10000,"year":1,"is_sc":2,"split":1}]','trim');# 证书(接受json)
         $cards          =   $request->param('cards','','trim');# 证书(接受json)
@@ -124,6 +124,7 @@ class Quality extends Common
                 $temp['split'] = isset($card['split'])?$card['split']:'1';
                 $temp['number_needed'] = isset($card['number_needed'])?$card['number_needed']:'';
                 $temp['company_price'] = isset($card['company_price'])?$card['company_price']:'';
+                $temp['customer_price'] = isset($card['customer_price'])?$card['customer_price']:'';
                 $temp['year'] = isset($card['year'])?$card['year']:'';
                 $card_data[] = $temp;
             }
@@ -142,10 +143,10 @@ class Quality extends Common
     }
 
     /**
-     * 获取需求列表
+     * 获取收资质的列表
      * @return \think\response\Json
      */
-    public function getQualityList()
+    public function getInQualityList()
     {
         $request = Request::instance();
 
@@ -176,6 +177,7 @@ class Quality extends Common
         }
         #====== 编辑where条件 start
         $where['quality.user_id'] = ['IN',$users];
+        $where['quality.type'] = 1;
 
         if($customer_name){
             $where['quality.customer_name'] = ['LIKE',"%$customer_name%"];
