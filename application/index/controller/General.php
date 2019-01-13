@@ -125,18 +125,31 @@ class General extends Common
                 'demand_id',
                 'customer_type'
             ],
-            # 修改需求状态
-            'quality'=>  [
-                'quality_cards',
-                'quality_id',
-                'customer_type'
-            ],
             # 修改匹配状态
             'match' =>  [
                 'match',
                 'match_id',
                 'status'
-            ]
+            ],
+
+            # 修改收资质状态
+            'qualityIn'=>  [
+                'quality_card',
+                'id',
+                'status'
+            ],
+            # 修改出资质状态
+            'qualityOut'=>  [
+                'quality_demand',
+                'quality_demand_id',
+                'customer_type'
+            ],
+            # 修改匹配资质状态
+            'qualityMatch'=>  [
+                'quality_match',
+                'quality_demand_id',
+                'status'
+            ],
         ];
 
         if(!in_array($type,array_keys($type_map))){

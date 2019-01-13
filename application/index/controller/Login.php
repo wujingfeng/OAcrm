@@ -17,7 +17,7 @@ use think\Db;
 use think\Request;
 use think\Session;
 
-class Login extends  Controller
+class Login extends  Common
 {
     public function index(){
 
@@ -58,28 +58,10 @@ class Login extends  Controller
                 'user_id'       =>      $result['user_id'],
                 'user_name'     =>      $result['user_name'],
             ];
-
             # ====存入session 并返回session_Id作为token
-            Session::set($result['user_id'],$data);
+            Session::set('userInfo',$data);
             $token = session_id();
             $data['token'] = $token;
-
-//            $has = Session::has($result['user_id']);
-//            dump($has);
-//            if($has){
-//                $userInfo = Session::get($result['user_id']);
-//                $data = $userInfo;
-//            }else{
-//                echo 333;
-//                $token = session_id();
-//                $data['token'] = $token;
-//                Session::set($result['user_id'],$data);
-//            }
-//            $userInfo = Session::get($result['user_id']);
-//            dump($userInfo);
-
-
-
 
             #===== 获取字典/菜单版本号(暂时用最大更新时间作版本号)
             $dictResult = Db('dictionary')->field('modified')->order('modified desc')->find();
@@ -91,9 +73,9 @@ class Login extends  Controller
             $perm_version = $permission['modified']?strtotime($permission['modified']):0;
             $data['menu_version'] = (int)$menu_version+(int)$perm_version;
 
-            return json_encode(['status'=>'success','message'=>$data]);
+            return $this->success_msg($data);
         }else{
-            return json_encode(['status'=>'failed','message'=>'登录失败,账号密码不正确']);
+            return $this->error_msg(5);
         }
 
     }

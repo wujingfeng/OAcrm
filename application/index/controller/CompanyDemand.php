@@ -695,7 +695,6 @@ class CompanyDemand extends Common
             'match_id'          =>  $match_id,
             'user_id'           =>  $user_id,
             'message'           =>  $logMsg,
-            'status'            =>  $status,
             'type'              =>  'staff'
         ];
 
@@ -742,39 +741,15 @@ class CompanyDemand extends Common
         }else{
             return $this->success_msg(3);
         }
+//        CREATE TRIGGER `sync_paid_ins` AFTER INSERT ON `match_detail` FOR EACH ROW begin
+//        update `match` set paid = (select sum(this_paid) from `match_detail` where match.match_id = new.match_id);
+//end;
+//
+//CREATE TRIGGER `sync_paid_up` AFTER UPDATE ON `match_detail` FOR EACH ROW begin
+//        update `match` set paid = (select sum(this_paid) from `match_detail` where match.match_id = new.match_id);
+//end;
 
-    }
 
-
-    public function finacialAudio(){
-        $id = Request::instance()->param('id','','trim'); #
-        $matcch_id = Request::instance()->param('matcch_id','','trim'); #
-        $status = Request::instance()->param('status','','trim');
-        $user_id = Request::instance()->param('user_id','','trim');
-
-        if(!$id){
-            return $this->error_msg('参数错误');
-        }
-
-        $model = Loader::model('');
-
-        # 查询操作者名字
-        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
-        $user_name = $user['user_name'];
-        if($status==1){
-            $logMsg = '财务审核员('.$user_name.')的审核结果为:通过';
-        }else{
-            $logMsg = '财务审核员('.$user_name.')的审核结果为:驳回';
-        }
-        $model = Loader::model('match_log');
-
-        $data = [
-            'match_id'          =>  $id,
-            'user_id'           =>  $user_id,
-            'message'           =>  $logMsg,
-            'type'              =>  'staff'
-        ];
-        $model->save($data);
     }
 
 }
