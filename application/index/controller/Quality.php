@@ -808,7 +808,6 @@ class Quality extends Common
             'quality_match_id'          =>  $match_id,
             'user_id'           =>  $user_id,
             'message'           =>  $logMsg,
-            'status'            =>  $status,
             'type'              =>  'quality'
         ];
 
@@ -822,9 +821,47 @@ class Quality extends Common
     }
 
 
+    /**
+     * 获取审核列表
+     * @return \think\response\Json
+     */
+    public function financialAuditList(){
+        $request = Request::instance();
+        $page = $request->param('page',1,'intval');
+        $rows = $request->param('rows',10,'intval');
+        $begin_item = ($page-1)*$rows;
+
+        $financial = Config::get('parameter.financial_audit_status');
+        $where = [
+            'quality_match.status'  =>  ['in',$financial],
+            'quality_match.valid'         =>  0
+        ];
+        $result = Db::view('quality_match','quality_match_id,status,paid,unpaid')
+            ->view('quality_match_detail','id,this_paid,transfer_way,transfer_message,company_account,staff_notice_time,demand_over_time,received_time','quality_match.quality_match_id = quality_match_detail.quality_match_id','left')
+            ->view('quality_demand_card','company_price','quality_match.quality_demand_card_id = quality_demand_card.id','left')
+            ->view('quality_demand','customer_name as demand_customer_name,due_time','quality_demand.quality_demand_id = quality_demand_card.quality_demand_id','left')
+            ->view('quality_cards','level,profession,customer_price,year','quality_match.quality_card_id = quality_cards.id','left')
+            ->view('quality','customer_name','quality.quality_id = quality_cards.quality_id','left')
+            ->view('user','user_name','quality.user_id = user.user_id','left')
+            ->where($where)
+            ->limit($begin_item,$rows)
+            ->select();
+        $count = Db::view('quality_match','quality_match_id')
+            ->view('quality_match_detail','id','quality_match.quality_match_id = quality_match_detail.quality_match_id','left')
+            ->where($where)
+            ->count();
+        if($result){
+            return $this->success_msg($result,$count);
+        }else{
+            return $this->success_msg(3);
+        }
+
+
+    }
+
     public function finacialAudio(){
         $id = Request::instance()->param('id','','trim'); #
-        $matcch_id = Request::instance()->param('matcch_id','','trim'); #
+        $match_id = Request::instance()->param('quality_match_id','','trim'); #
         $status = Request::instance()->param('status','','trim');
         $user_id = Request::instance()->param('user_id','','trim');
 
@@ -832,7 +869,6 @@ class Quality extends Common
             return $this->error_msg('参数错误');
         }
 
-        $model = Loader::model('');
 
         # 查询操作者名字
         $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
@@ -842,7 +878,7 @@ class Quality extends Common
         }else{
             $logMsg = '财务审核员('.$user_name.')的审核结果为:驳回';
         }
-        $model = Loader::model('match_log');
+        $model = Loader::model('quality_match_log');
 
         $data = [
             'quality_match_id'          =>  $id,
