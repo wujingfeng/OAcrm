@@ -228,14 +228,12 @@ class Staff extends Common
         if($type == 'match'){
             $customer_type = '5ebf1d7b31ded660cc201b500db053c9';
 //            # 是在匹配中获取人员列表，则应该排除已匹配的证件
-            $matchRes = Db('match')->field('staff_card_id')->select();
+            $matchRes = Db('match')->field('staff_card_id')->where(['staff_card_id'=>'is not null'])->select();
             if($matchRes){
                 $matched_staff_id = array_column($matchRes,'staff_card_id');
 
                 $where['staff_cards.id'] = ['not in',$matched_staff_id];
             }
-
-
 
         }
 

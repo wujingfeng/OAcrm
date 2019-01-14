@@ -111,8 +111,6 @@ class Role extends Common
             #更新角色基本信息
             $result = $model->save($data,['role_id'=>$role_id]);
             #更新角色权限信息
-            # 更新操作前
-
             $p_result = $permissionModel->save($permissionData,['role_id'=>$role_id]);
 
         }
@@ -151,8 +149,9 @@ class Role extends Common
     }
 
     public function getMenuList(){
+        $user_id = Request::instance()->param('user_id','','trim');
 
-echo 1;
+
 
 
 
