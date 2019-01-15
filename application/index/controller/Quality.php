@@ -674,7 +674,7 @@ class Quality extends Common
         $where = [
             'quality_match.quality_demand_id'=>$quality_demand_id
         ];
-        $result = Db::view('quality_match','quality_match_id,status,paid,unpaid,valid')
+        $result = Db::view('quality_match','quality_match_id,user_id,status,paid,unpaid,valid')
             ->view('quality_demand_card','company_price','quality_match.quality_demand_card_id = quality_demand_card.id','left')
             ->view('quality_demand','customer_name as demand_customer_name,due_time','quality_demand.quality_demand_id = quality_demand_card.quality_demand_id','left')
             ->view('quality_cards','level,profession,year,customer_price','quality_match.quality_card_id = quality_cards.id','left')
@@ -682,14 +682,12 @@ class Quality extends Common
             ->view('user','user_name','quality.user_id = user.user_id','left')
             ->where($where)
             ->select();
-        $logResult = Db('quality_match_detail_log')->field('quality_match_id,message')->where(['type'=>'quality'])->select();
-        $logMap = [];
-        if($logResult){
-            foreach($logResult as $log){
-                $logMap[$log['quality_match_id']][] = $log['message'];
-            }
-        }
+
         if($result){
+            $quality_match_id_list = array_column($result,'quality_match_id');
+
+            # 生成日志
+            $logMap = $this->generate_log($quality_match_id_list);
             $logMapKeys = array_keys($logMap);
             foreach ($result as &$re){
                 if(in_array($re['quality_match_id'],$logMapKeys)){
@@ -709,6 +707,67 @@ class Quality extends Common
 
     }
 
+    /**
+     * 生成日志
+     * @param $quality_match_id_list
+     * @return array
+     */
+    private function generate_log($quality_match_id_list){
+        # 加field的目的在于指定字段的顺序
+        $detailResult = Db::view('quality_match_detail','status,this_paid,transfer_way,company_account,staff_notice_time,received_time,audio_user_id,audio_date,valid,transfer_message,demand_over_time,id,quality_match_id,modified')
+            ->view('quality_match','user_id','quality_match_detail.quality_match_id = quality_match.quality_match_id','left')
+            ->where(['quality_match_detail.quality_match_id'=>['in',$quality_match_id_list]])
+            ->order('modified desc')
+            ->select();
+        $logMap = [];
+        # 生成配对信息日志
+        $match_detail_remark = Config::get('parameter.match_detail_remark');
+        $remark_keys = array_keys($match_detail_remark);
+        if($detailResult){
+
+            # ====查询字典对应的名称 start
+            $find_dict_name_list = array_filter(array_unique(array_merge(array_column($detailResult,'transfer_way'),array_column($detailResult,'company_account'),array_column($detailResult,'status'))));
+            $dict_result = Db('dictionary')->field('dictionary_id,name')->where(['dictionary_id'=>['in',$find_dict_name_list]])->select();
+            $dict_map = array_column($dict_result,'name','dictionary_id');
+            # === end
+
+            # ==== 查询用户id对应的用户名 start
+            $user_id_list = array_filter(array_unique(array_merge(array_column($detailResult,'user_id'),array_column($detailResult,'audio_user_id'))));
+            $userResult = Db('user')->field('user_id,user_name')->where(['user_id'=>['in',$user_id_list]])->select();
+            $user_map = array_column($userResult,'user_name','user_id');
+            # ===end
+            foreach($detailResult as $detail){
+                $logMsg = $user_map[$detail['user_id']].'于'.$detail['modified'].'修改';
+//                $logMsg = '';
+                foreach($detail as $key=>$d){
+                    if($key == 'valid' ){
+                        if($d == 2){
+                            $d = '驳回';
+                        }elseif($d == 1){
+                            $d = '通过';
+                        }else{
+                            $d = '审核中';
+                        }
+                    }
+                    if(in_array($key,$remark_keys) && $d){
+                        # 将字典值,转换为对应的名称
+
+                        if(in_array($d,$find_dict_name_list)){
+                            $logMsg .= $match_detail_remark[$key].$dict_map[$d].'。';
+                        }elseif(in_array($d,$user_id_list)){
+                            $logMsg .= $match_detail_remark[$key].$user_map[$d].'。';
+                        }else{
+                            $logMsg .= $match_detail_remark[$key].$d.'。';
+                        }
+                    }
+                }
+                $logMap[$detail['quality_match_id']][] = $logMsg;
+
+            }
+        }
+
+        return $logMap;
+    }
 
     /**
      * 修改配对详情状态信息
@@ -737,32 +796,35 @@ class Quality extends Common
         $financial = Config::get('parameter.financial_audit_status');
         # 如果修改的状态不需要财务审核,则直接判断状态修改真实有效,否则需要财务审核
         if(in_array($status,$financial)){
-            $saveData = [
-                'status'=>$status,
-                'valid'=>0
-            ];
+            $valid = 0;
+//            $saveData = [
+//                'status'=>$status,
+//                'valid'=>$valid
+//            ];
         }else{
+            $valid = 1;
             $saveData = [
                 'status'=>$status,
-                'valid'=>1
+                'valid'=>$valid
             ];
+            # 更新配对表中的状态
+            $matchModel = Loader::model('quality_match');
+            $result = $matchModel->save($saveData,['quality_match_id'=>$match_id]);
         }
-        # 更新配对表中的状态
-        $matchModel = Loader::model('quality_match');
-        $result = $matchModel->save($saveData,['quality_match_id'=>$match_id]);
 
-        # 查询字典对应的名称,用于写入日志
-        $find_dict_name_list = [];
-        $transfer_way?array_push($find_dict_name_list,$transfer_way):'';
-        $company_account?array_push($find_dict_name_list,$company_account):'';
-        $status?array_push($find_dict_name_list,$status):'';
 
-        # 查询操作者名字
-        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
-        $user_name = $user['user_name'];
-        $dict_result = Db('dictionary')->field('dictionary_id,name')->where(['dictionary_id'=>['in',$find_dict_name_list]])->select();
-        $dict_map = array_column($dict_result,'name','dictionary_id');
-        $logMsg = $user_name.'于'.date('Y-m-d H:i:s',time()).'将状态修改为:'.$dict_map[$status].'。';
+//        # 查询字典对应的名称,用于写入日志
+//        $find_dict_name_list = [];
+//        $transfer_way?array_push($find_dict_name_list,$transfer_way):'';
+//        $company_account?array_push($find_dict_name_list,$company_account):'';
+//        $status?array_push($find_dict_name_list,$status):'';
+////
+////        # 查询操作者名字
+//        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
+//        $user_name = $user['user_name'];
+//        $dict_result = Db('dictionary')->field('dictionary_id,name')->where(['dictionary_id'=>['in',$find_dict_name_list]])->select();
+//        $dict_map = array_column($dict_result,'name','dictionary_id');
+//        $logMsg = $user_name.'于'.date('Y-m-d H:i:s',time()).'将状态修改为:'.$dict_map[$status].'。';
 
 
         if($has_detail){
@@ -775,6 +837,8 @@ class Quality extends Common
                 'staff_notice_time'  =>  $staff_notice_time,
                 'demand_over_time'  =>  $demand_over_time,
                 'received_time'  =>  $received_time,
+                'valid'  =>  $valid,
+                'status'  =>  $status,
             ];
 
             $detailModel = Loader::model('quality_match_detail');
@@ -785,33 +849,30 @@ class Quality extends Common
                 $result = $detailModel->save($data,['id'=>$id]);
             }
 
-            # 将配对信息写入日志表
-
-
-
-            $match_detail_remark = Config::get('parameter.match_detail_remark');
-            $remark_keys = array_keys($match_detail_remark);
-            $data_keys = array_keys($data);
-            foreach($data_keys as $dkeys){
-                if(in_array($dkeys,$remark_keys) && $data[$dkeys]){
-                    if(in_array($data[$dkeys],$find_dict_name_list)){
-                        $logMsg .= $match_detail_remark[$dkeys].$dict_map[$data[$dkeys]].'。';
-                    }else{
-                        $logMsg .= $match_detail_remark[$dkeys].$data[$dkeys].'。';
-                    }
-                }
-            }
+//            # 将配对信息写入日志表
+//            $match_detail_remark = Config::get('parameter.match_detail_remark');
+//            $remark_keys = array_keys($match_detail_remark);
+//            $data_keys = array_keys($data);
+//            foreach($data_keys as $dkeys){
+//                if(in_array($dkeys,$remark_keys) && $data[$dkeys]){
+//                    if(in_array($data[$dkeys],$find_dict_name_list)){
+//                        $logMsg .= $match_detail_remark[$dkeys].$dict_map[$data[$dkeys]].'。';
+//                    }else{
+//                        $logMsg .= $match_detail_remark[$dkeys].$data[$dkeys].'。';
+//                    }
+//                }
+//            }
 
         }
-        $model = Loader::model('quality_match_log');
-        $logData = [
-            'quality_match_id'          =>  $match_id,
-            'user_id'           =>  $user_id,
-            'message'           =>  $logMsg,
-            'type'              =>  'quality'
-        ];
-
-        $model->save($logData);
+//        $model = Loader::model('quality_match_log');
+//        $logData = [
+//            'quality_match_id'          =>  $match_id,
+//            'user_id'           =>  $user_id,
+//            'message'           =>  $logMsg,
+//            'type'              =>  'quality'
+//        ];
+//
+//        $model->save($logData);
         if($result){
             return $this->success_msg(1);
         }else{
@@ -833,8 +894,8 @@ class Quality extends Common
 
         $financial = Config::get('parameter.financial_audit_status');
         $where = [
-            'quality_match.status'  =>  ['in',$financial],
-            'quality_match.valid'         =>  0
+            'quality_match_detail.status'  =>  ['in',$financial],
+            'quality_match_detail.valid'         =>  0
         ];
         $result = Db::view('quality_match','quality_match_id,status,paid,unpaid')
             ->view('quality_match_detail','id,this_paid,transfer_way,transfer_message,company_account,staff_notice_time,demand_over_time,received_time','quality_match.quality_match_id = quality_match_detail.quality_match_id','left')
@@ -859,34 +920,64 @@ class Quality extends Common
 
     }
 
+    /**
+     * 财务审核接口
+     * @return \think\response\Json
+     */
     public function finacialAudio(){
         $id = Request::instance()->param('id','','trim'); #
-        $match_id = Request::instance()->param('quality_match_id','','trim'); #
-        $status = Request::instance()->param('status','','trim');
+        $quality_match_id = Request::instance()->param('quality_match_id','','trim'); #
+        $valid = Request::instance()->param('valid',1,'trim');
         $user_id = Request::instance()->param('user_id','','trim');
-
-        if(!$id){
+        $valid = $valid == 2?2:1;
+        if(!$id || !$quality_match_id || !$user_id){
             return $this->error_msg('参数错误');
         }
 
+        # 审核通过时,修改证件状态和有效值
+        # 不通过时,只需要保存修改记录  不需要修改证件状态和有效值
+        if ($valid == 1){
+            $status = Db('quality_match_detail')->field('status')->where(['id'=>$id])->find();
+            if($status){
+                $status = $status['status'];
+            }else{
+                return $this->error_msg('参数错误');
+            }
+            $saveData = [
+                'status'=>$status,
+                'valid'=>$valid
+            ];
+            # 更新配对表中的状态
+            $matchModel = Loader::model('quality_match');
+            $result = $matchModel->save($saveData,['quality_match_id'=>$quality_match_id]);
 
-        # 查询操作者名字
-        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
-        $user_name = $user['user_name'];
-        if($status==1){
-            $logMsg = '财务审核员('.$user_name.')的审核结果为:通过';
+            $detailData = [
+                'audio_user_id' =>  $user_id,
+                'audio_date'    =>  date('Y-m-d H:i:s',time()),
+                'valid'         =>  $valid
+            ];
+            # 更新配对详情表信息
+            $detailModel = Loader::model('quality_match_detail');
+            $result_log = $detailModel->save($detailData,['id'=>$id]);
         }else{
-            $logMsg = '财务审核员('.$user_name.')的审核结果为:驳回';
+            $result = true;
+            $detailData = [
+                'audio_user_id' =>  $user_id,
+                'audio_date'    =>  date('Y-m-d H:i:s',time()),
+                'valid'         =>  $valid
+            ];
+            # 更新配对详情表信息
+            $detailModel = Loader::model('quality_match_detail');
+            $result_log = $detailModel->save($detailData,['id'=>$id]);
         }
-        $model = Loader::model('quality_match_log');
 
-        $data = [
-            'quality_match_id'          =>  $id,
-            'user_id'           =>  $user_id,
-            'message'           =>  $logMsg,
-            'type'              =>  'quality'
-        ];
-        $model->save($data);
+        if($result && $result_log){
+            return $this->success_msg(1);
+        }else{
+            return $this->error_msg(2);
+        }
+
+
     }
 
 }

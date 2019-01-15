@@ -73,6 +73,7 @@ return [
 
     # 配对详情字段备注信息(用于写入配对日志使用)
     'match_detail_remark'       =>[
+        'status'=>'状态为:',
         'this_paid'  =>  '本次付款金额(单位:元)为:',
         'transfer_way'  =>  '支付方式为:',
 //        'transfer_message'  =>  '转账方信息',
@@ -80,6 +81,9 @@ return [
         'staff_notice_time'  =>  '修改人才公示时间为:',
 //        'demand_over_time'  =>  '合同/订单过期时间',
         'received_time'  =>  '预计到账时间为:',
+        'audio_user_id' =>  '财务审核员:',
+        'audio_date'    =>  '审核时间为:',
+        'valid'         =>  '当前状态为:'
     ]
 
 

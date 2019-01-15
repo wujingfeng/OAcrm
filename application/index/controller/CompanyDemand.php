@@ -569,14 +569,11 @@ class CompanyDemand extends Common
             ->view('user','user_name','staff.user_id = user.user_id','left')
             ->where($where)
             ->select();
-        $logResult = Db('match_detail_log')->field('match_id,message')->where(['type'=>'staff'])->select();
-        $logMap = [];
-        if($logResult){
-            foreach($logResult as $log){
-                $logMap[$log['match_id']][] = $log['message'];
-            }
-        }
+
         if($result){
+            $match_id_list = array_column($result,'match_id');
+            # 生成日志
+            $logMap = $this->generate_log($match_id_list);
             $logMapKeys = array_keys($logMap);
             foreach ($result as &$re){
                 if(in_array($re['match_id'],$logMapKeys)){
@@ -595,7 +592,67 @@ class CompanyDemand extends Common
         }
 
     }
+    /**
+     * 生成日志
+     * @param $quality_match_id_list
+     * @return array
+     */
+    private function generate_log($match_id_list){
+        # 加field的目的在于指定字段的顺序
+        $detailResult = Db::view('match_detail','status,this_paid,transfer_way,company_account,staff_notice_time,received_time,audio_user_id,audio_date,valid,transfer_message,demand_over_time,id,match_id,modified')
+            ->view('match','user_id','match_detail.match_id = match.match_id','left')
+            ->where(['match_detail.match_id'=>['in',$match_id_list]])
+            ->order('modified desc')
+            ->select();
+        $logMap = [];
+        # 生成配对信息日志
+        $match_detail_remark = Config::get('parameter.match_detail_remark');
+        $remark_keys = array_keys($match_detail_remark);
+        if($detailResult){
 
+            # ====查询字典对应的名称 start
+            $find_dict_name_list = array_filter(array_unique(array_merge(array_column($detailResult,'transfer_way'),array_column($detailResult,'company_account'),array_column($detailResult,'status'))));
+            $dict_result = Db('dictionary')->field('dictionary_id,name')->where(['dictionary_id'=>['in',$find_dict_name_list]])->select();
+            $dict_map = array_column($dict_result,'name','dictionary_id');
+            # === end
+
+            # ==== 查询用户id对应的用户名 start
+            $user_id_list = array_filter(array_unique(array_merge(array_column($detailResult,'user_id'),array_column($detailResult,'audio_user_id'))));
+            $userResult = Db('user')->field('user_id,user_name')->where(['user_id'=>['in',$user_id_list]])->select();
+            $user_map = array_column($userResult,'user_name','user_id');
+            # ===end
+            foreach($detailResult as $detail){
+                $logMsg = $user_map[$detail['user_id']].'于'.$detail['modified'].'修改';
+//                $logMsg = '';
+                foreach($detail as $key=>$d){
+                    if($key == 'valid' ){
+                        if($d == 2){
+                            $d = '驳回';
+                        }elseif($d == 1){
+                            $d = '通过';
+                        }else{
+                            $d = '审核中';
+                        }
+                    }
+                    if(in_array($key,$remark_keys) && $d){
+                        # 将字典值,转换为对应的名称
+
+                        if(in_array($d,$find_dict_name_list)){
+                            $logMsg .= $match_detail_remark[$key].$dict_map[$d].'。';
+                        }elseif(in_array($d,$user_id_list)){
+                            $logMsg .= $match_detail_remark[$key].$user_map[$d].'。';
+                        }else{
+                            $logMsg .= $match_detail_remark[$key].$d.'。';
+                        }
+                    }
+                }
+                $logMap[$detail['match_id']][] = $logMsg;
+
+            }
+        }
+
+        return $logMap;
+    }
 
     /**
      * 修改配对详情状态信息
@@ -624,32 +681,35 @@ class CompanyDemand extends Common
         $financial = Config::get('parameter.financial_audit_status');
         # 如果修改的状态不需要财务审核,则直接判断状态修改真实有效,否则需要财务审核
         if(in_array($status,$financial)){
-            $saveData = [
-                'status'=>$status,
-                'valid'=>0
-            ];
+            $valid = 0;
+//            $saveData = [
+//                'status'=>$status,
+//                'valid'=>0
+//            ];
         }else{
+            $valid = 1;
             $saveData = [
                 'status'=>$status,
-                'valid'=>1
+                'valid'=>$valid
             ];
+            # 更新配对表中的状态
+            $matchModel = Loader::model('match');
+            $result = $matchModel->save($saveData,['match_id'=>$match_id]);
         }
-        # 更新配对表中的状态
-        $matchModel = Loader::model('match');
-        $result = $matchModel->save($saveData,['match_id'=>$match_id]);
+
 
         # 查询字典对应的名称,用于写入日志
-        $find_dict_name_list = [];
-        $transfer_way?array_push($find_dict_name_list,$transfer_way):'';
-        $company_account?array_push($find_dict_name_list,$company_account):'';
-        $status?array_push($find_dict_name_list,$status):'';
-
-        # 查询操作者名字
-        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
-        $user_name = $user['user_name'];
-        $dict_result = Db('dictionary')->field('dictionary_id,name')->where(['dictionary_id'=>['in',$find_dict_name_list]])->select();
-        $dict_map = array_column($dict_result,'name','dictionary_id');
-        $logMsg = $user_name.'于'.date('Y-m-d H:i:s',time()).'将状态修改为:'.$dict_map[$status].'。';
+//        $find_dict_name_list = [];
+//        $transfer_way?array_push($find_dict_name_list,$transfer_way):'';
+//        $company_account?array_push($find_dict_name_list,$company_account):'';
+//        $status?array_push($find_dict_name_list,$status):'';
+//
+//        # 查询操作者名字
+//        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
+//        $user_name = $user['user_name'];
+//        $dict_result = Db('dictionary')->field('dictionary_id,name')->where(['dictionary_id'=>['in',$find_dict_name_list]])->select();
+//        $dict_map = array_column($dict_result,'name','dictionary_id');
+//        $logMsg = $user_name.'于'.date('Y-m-d H:i:s',time()).'将状态修改为:'.$dict_map[$status].'。';
 
 
         if($has_detail){
@@ -662,6 +722,8 @@ class CompanyDemand extends Common
                 'staff_notice_time'  =>  $staff_notice_time,
                 'demand_over_time'  =>  $demand_over_time,
                 'received_time'  =>  $received_time,
+                'valid'  =>  $valid,
+                'status'  =>  $status,
             ];
 
             $detailModel = Loader::model('match_detail');
@@ -673,32 +735,29 @@ class CompanyDemand extends Common
             }
 
             # 将配对信息写入日志表
-
-
-
-            $match_detail_remark = Config::get('parameter.match_detail_remark');
-            $remark_keys = array_keys($match_detail_remark);
-            $data_keys = array_keys($data);
-            foreach($data_keys as $dkeys){
-                if(in_array($dkeys,$remark_keys) && $data[$dkeys]){
-                    if(in_array($data[$dkeys],$find_dict_name_list)){
-                        $logMsg .= $match_detail_remark[$dkeys].$dict_map[$data[$dkeys]].'。';
-                    }else{
-                        $logMsg .= $match_detail_remark[$dkeys].$data[$dkeys].'。';
-                    }
-                }
-            }
-
+//            $match_detail_remark = Config::get('parameter.match_detail_remark');
+//            $remark_keys = array_keys($match_detail_remark);
+//            $data_keys = array_keys($data);
+//            foreach($data_keys as $dkeys){
+//                if(in_array($dkeys,$remark_keys) && $data[$dkeys]){
+//                    if(in_array($data[$dkeys],$find_dict_name_list)){
+//                        $logMsg .= $match_detail_remark[$dkeys].$dict_map[$data[$dkeys]].'。';
+//                    }else{
+//                        $logMsg .= $match_detail_remark[$dkeys].$data[$dkeys].'。';
+//                    }
+//                }
+//            }
+//
         }
-        $model = Loader::model('match_log');
-        $logData = [
-            'match_id'          =>  $match_id,
-            'user_id'           =>  $user_id,
-            'message'           =>  $logMsg,
-            'type'              =>  'staff'
-        ];
-
-        $model->save($logData);
+//        $model = Loader::model('match_log');
+//        $logData = [
+//            'match_id'          =>  $match_id,
+//            'user_id'           =>  $user_id,
+//            'message'           =>  $logMsg,
+//            'type'              =>  'staff'
+//        ];
+//
+//        $model->save($logData);
         if($result){
             return $this->success_msg(1);
         }else{
@@ -719,8 +778,8 @@ class CompanyDemand extends Common
 
         $financial = Config::get('parameter.financial_audit_status');
         $where = [
-            'match.status'  =>  ['in',$financial],
-            'match.valid'         =>  0
+            'match_detail.status'  =>  ['in',$financial],
+            'match_detail.valid'         =>  0
         ];
         $result = Db::view('match','match_id,status,paid,unpaid')
             ->view('match_detail','id,this_paid,transfer_way,transfer_message,company_account,staff_notice_time,demand_over_time,received_time','match.match_id = match_detail.match_id','left')
@@ -741,46 +800,66 @@ class CompanyDemand extends Common
         }else{
             return $this->success_msg(3);
         }
-//        CREATE TRIGGER `sync_paid_ins` AFTER INSERT ON `match_detail` FOR EACH ROW begin
-//        update `match` set paid = (select sum(this_paid) from `match_detail` where match.match_id = new.match_id);
-//end;
-//
-//CREATE TRIGGER `sync_paid_up` AFTER UPDATE ON `match_detail` FOR EACH ROW begin
-//        update `match` set paid = (select sum(this_paid) from `match_detail` where match.match_id = new.match_id);
-//end;
-
 
     }
 
-    public function finacialAudio(){
-        $id = Request::instance()->param('id','','trim'); #
-        $match_id = Request::instance()->param('match_id','','trim'); #
-        $status = Request::instance()->param('status','','trim');
-        $user_id = Request::instance()->param('user_id','','trim');
+        /**
+         * 财务审核接口
+         * @return \think\response\Json
+         */
+        public function finacialAudio(){
+            $id = Request::instance()->param('id','','trim'); #
+            $match_id = Request::instance()->param('match_id','','trim'); #
+            $valid = Request::instance()->param('valid',1,'trim');
+            $user_id = Request::instance()->param('user_id','','trim');
+            $valid = $valid == 2?2:1;
+            if(!$id || !$match_id || !$user_id){
+                return $this->error_msg('参数错误');
+            }
 
-        if(!$id){
-            return $this->error_msg('参数错误');
+            # 审核通过时,修改证件状态和有效值
+            # 不通过时,只需要保存修改记录  不需要修改证件状态和有效值
+            if ($valid == 1){
+                $status = Db('match_detail')->field('status')->where(['id'=>$id])->find();
+                if($status){
+                    $status = $status['status'];
+                }else{
+                    return $this->error_msg('参数错误');
+                }
+                $saveData = [
+                    'status'=>$status,
+                    'valid'=>$valid
+                ];
+                # 更新配对表中的状态
+                $matchModel = Loader::model('match');
+                $result = $matchModel->save($saveData,['match_id'=>$match_id]);
+
+                $detailData = [
+                    'audio_user_id' =>  $user_id,
+                    'audio_date'    =>  date('Y-m-d H:i:s',time()),
+                    'valid'         =>  $valid
+                ];
+                # 更新配对详情表信息
+                $detailModel = Loader::model('match_detail');
+                $result_log = $detailModel->save($detailData,['id'=>$id]);
+            }else{
+                $result = true;
+                $detailData = [
+                    'audio_user_id' =>  $user_id,
+                    'audio_date'    =>  date('Y-m-d H:i:s',time()),
+                    'valid'         =>  $valid
+                ];
+                # 更新配对详情表信息
+                $detailModel = Loader::model('match_detail');
+                $result_log = $detailModel->save($detailData,['id'=>$id]);
+            }
+
+            if($result && $result_log){
+                return $this->success_msg(1);
+            }else{
+                return $this->error_msg(2);
+            }
+
         }
-
-        $model = Loader::model('');
-
-        # 查询操作者名字
-        $user = Db('user')->field('user_name')->where(['user_id'=>$user_id])->find();
-        $user_name = $user['user_name'];
-        if($status==1){
-            $logMsg = '财务审核员('.$user_name.')的审核结果为:通过';
-        }else{
-            $logMsg = '财务审核员('.$user_name.')的审核结果为:驳回';
-        }
-        $model = Loader::model('match_log');
-
-        $data = [
-            'quality_match_id'          =>  $id,
-            'user_id'           =>  $user_id,
-            'message'           =>  $logMsg,
-            'type'              =>  'quality'
-        ];
-        $model->save($data);
-    }
 
 }
